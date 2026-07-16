@@ -1,0 +1,11 @@
+Customer_ID,First_Name,Last_Name,Email_Address,Phone_Number,City,State_Province,Country,Created_Timestamp
+CUST-001,James,Anderson,j.anderson.new@gmail.com,416-555-0101,Toronto,Ontario,Canada,2023-01-05 08:12:34
+CUST-003,Michael,Williams,michael.williams@email.com,514-555-0303,Quebec City,Quebec,Canada,2023-01-10 11:20:55
+CUST-007,Christopher,Davis,chris.davis.updated@email.com,902-555-0707,Halifax,Nova Scotia,Canada,2023-01-20 13:40:18
+CUST-012,Stephanie,White,stephanie.white@email.com,905-555-1212,Brampton,Ontario,Canada,2023-02-03 14:35:16
+CUST-015,Andrew,Thompson,andrew.t.new@outlook.com,416-555-1515,Etobicoke,Ontario,Canada,2023-02-10 13:20:07
+CUST-021,Tyler,Lewis,tyler.lewis@email.com,416-555-2121,Hamilton,Ontario,Canada,2024-03-01 09:00:00
+CUST-022,Brittany,Lee,brittany.lee@email.com,604-555-2222,Surrey,British Columbia,Canada,2024-03-02 10:30:00
+CUST-023,Brandon,Walker,brandon.walker@email.com,403-555-2323,Lethbridge,Alberta,Canada,2024-03-03 11:45:00
+CUST-024,Samantha,Hall,samantha.hall@email.com,613-555-2424,Kingston,Ontario,Canada,2024-03-04 13:00:00
+CUST-025,Nathan,Allen,nathan.allen@email.com,780-555-2525,Fort McMurray,Alberta,Canada,2024-03-05 14:15:00

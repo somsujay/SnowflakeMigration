@@ -1,0 +1,31 @@
+Transaction_ID,Account_ID,Transaction_Date,Transaction_Type,Amount,Description
+TXN-00101,ACCT-1001,2024-03-01 09:00:00,Deposit,2600.00,Payroll deposit
+TXN-00102,ACCT-1001,2024-03-01 15:30:00,Payment,1900.00,Rent payment
+TXN-00103,ACCT-1002,2024-03-01 11:00:00,Deposit,500.00,Savings deposit
+TXN-00104,ACCT-1003,2024-03-01 09:15:00,Deposit,3300.00,Payroll deposit
+TXN-00105,ACCT-1003,2024-03-01 14:00:00,Purchase,88.50,Grocery store purchase
+TXN-00106,ACCT-1005,2024-03-02 09:00:00,Deposit,2900.00,Payroll deposit
+TXN-00107,ACCT-1005,2024-03-02 16:00:00,Withdrawal,300.00,ATM withdrawal
+TXN-00108,ACCT-1007,2024-03-02 09:30:00,Deposit,3600.00,Payroll deposit
+TXN-00109,ACCT-1007,2024-03-02 13:00:00,Payment,130.00,Internet bill payment
+TXN-00110,ACCT-1009,2024-03-03 09:00:00,Deposit,2700.00,Payroll deposit
+TXN-00111,ACCT-1009,2024-03-03 15:00:00,Payment,195.00,Utility payment
+TXN-00112,ACCT-1011,2024-03-03 09:15:00,Deposit,3200.00,Payroll deposit
+TXN-00113,ACCT-1011,2024-03-03 14:30:00,Purchase,220.00,Electronics purchase
+TXN-00114,ACCT-1013,2024-03-04 09:00:00,Deposit,2500.00,Payroll deposit
+TXN-00115,ACCT-1013,2024-03-04 16:30:00,Withdrawal,200.00,ATM withdrawal
+TXN-00116,ACCT-1021,2024-03-04 09:00:00,Deposit,4300.00,Payroll deposit
+TXN-00117,ACCT-1021,2024-03-04 14:00:00,Payment,1850.00,Rent payment
+TXN-00118,ACCT-1036,2024-03-01 10:00:00,Deposit,3000.00,Opening deposit
+TXN-00119,ACCT-1036,2024-03-03 14:00:00,Withdrawal,200.00,ATM withdrawal
+TXN-00120,ACCT-1037,2024-03-01 10:30:00,Deposit,1000.00,Initial savings transfer
+TXN-00121,ACCT-1038,2024-03-02 11:00:00,Deposit,2800.00,Opening deposit
+TXN-00122,ACCT-1038,2024-03-04 13:00:00,Payment,150.00,Utility payment
+TXN-00123,ACCT-1039,2024-03-02 11:30:00,Deposit,7500.00,Investment contribution
+TXN-00124,ACCT-1040,2024-03-03 12:00:00,Deposit,3500.00,Opening deposit
+TXN-00125,ACCT-1040,2024-03-05 10:00:00,Purchase,99.99,Online purchase
+TXN-00126,ACCT-1041,2024-03-04 14:00:00,Deposit,2700.00,Opening deposit
+TXN-00127,ACCT-1042,2024-03-04 14:30:00,Deposit,800.00,Initial savings transfer
+TXN-00128,ACCT-1043,2024-03-05 15:00:00,Deposit,3100.00,Opening deposit
+TXN-00129,ACCT-1044,2024-03-05 15:30:00,Purchase,345.00,Home appliance purchase
+TXN-00130,ACCT-1044,2024-03-05 16:00:00,Payment,500.00,Credit card payment

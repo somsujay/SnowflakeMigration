@@ -1,0 +1,64 @@
+name: CI – Lint & Validate
+
+on:
+  pull_request:
+    branches: [develop, 'release/*', main]
+    paths:
+      - 'Snowflake_Scripts/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'environments.yml'
+      - '.sqlfluff'
+
+jobs:
+  sql-lint:
+    name: SQL Lint (sqlfluff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install sqlfluff
+        run: pip install sqlfluff
+
+      - name: Run sqlfluff lint
+        run: |
+          sqlfluff lint Snowflake_Scripts/ \
+            --dialect snowflake \
+            --config .sqlfluff
+
+  validate-scripts:
+    name: Validate Deployment Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check scripts are executable-ready
+        run: |
+          echo ">> Verifying all SQL scripts exist and are non-empty..."
+          for f in Snowflake_Scripts/0*.sql Snowflake_Scripts/1*.sql; do
+            if [[ ! -s "$f" ]]; then
+              echo "ERROR: $f is missing or empty"
+              exit 1
+            fi
+            echo "   OK: $f"
+          done
+
+      - name: Validate environments.yml structure
+        run: |
+          for env in dev qa preprod prod; do
+            if ! grep -q "^${env}:" environments.yml; then
+              echo "ERROR: Environment '${env}' not found in environments.yml"
+              exit 1
+            fi
+          done
+          echo "All environments present in environments.yml"
+
+      - name: Shellcheck deployment scripts
+        run: |
+          sudo apt-get install -y shellcheck
+          shellcheck scripts/deploy.sh scripts/rollback.sh scripts/run_smoke_tests.sh || true

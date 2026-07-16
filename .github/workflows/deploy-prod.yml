@@ -1,0 +1,189 @@
+name: Deploy to PROD
+
+on:
+  push:
+    tags: ['v*']
+
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - deploy
+          - rollback
+      rollback_version:
+        description: 'Version to rollback to (tag or SHA, required for rollback)'
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  # --- DEPLOY JOB (tag push or manual deploy) ---
+  deploy:
+    name: Deploy to PROD
+    runs-on: ubuntu-latest
+    environment: production
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Snowflake CLI
+        run: pip install snowflake-cli-labs
+
+      - name: Configure Snowflake connection
+        env:
+          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
+          SF_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
+          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
+        run: |
+          mkdir -p ~/.snowflake
+          cat > ~/.snowflake/connections.toml << EOF
+          [HAKKODAINC_PARTNER]
+          account = "${SF_ACCOUNT}"
+          user = "${SF_USER}"
+          password = "${SF_PASSWORD}"
+          warehouse = "PROD_WH"
+          EOF
+
+      - name: Deploy SQL scripts
+        run: |
+          chmod +x scripts/deploy.sh
+          bash scripts/deploy.sh --env=prod
+
+  smoke-test:
+    name: PROD Smoke Tests
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Snowflake CLI
+        run: pip install snowflake-cli-labs
+
+      - name: Configure Snowflake connection
+        env:
+          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
+          SF_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
+          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
+        run: |
+          mkdir -p ~/.snowflake
+          cat > ~/.snowflake/connections.toml << EOF
+          [HAKKODAINC_PARTNER]
+          account = "${SF_ACCOUNT}"
+          user = "${SF_USER}"
+          password = "${SF_PASSWORD}"
+          warehouse = "PROD_WH"
+          EOF
+
+      - name: Run smoke tests
+        run: |
+          chmod +x scripts/run_smoke_tests.sh
+          bash scripts/run_smoke_tests.sh --env=prod
+
+  data-validation:
+    name: PROD Data Validation
+    runs-on: ubuntu-latest
+    needs: smoke-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Snowflake CLI
+        run: pip install snowflake-cli-labs
+
+      - name: Configure Snowflake connection
+        env:
+          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
+          SF_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
+          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
+        run: |
+          mkdir -p ~/.snowflake
+          cat > ~/.snowflake/connections.toml << EOF
+          [HAKKODAINC_PARTNER]
+          account = "${SF_ACCOUNT}"
+          user = "${SF_USER}"
+          password = "${SF_PASSWORD}"
+          warehouse = "PROD_WH"
+          EOF
+
+      - name: Run integration tests
+        run: |
+          snow sql -c HAKKODAINC_PARTNER \
+            --database SSOM_COCO_DB_PROD \
+            --warehouse PROD_WH \
+            -f tests/integration_test.sql
+
+  notify:
+    name: Notify Deployment
+    runs-on: ubuntu-latest
+    needs: data-validation
+    if: always()
+    steps:
+      - name: Deployment result
+        run: |
+          if [[ "${{ needs.data-validation.result }}" == "success" ]]; then
+            echo "::notice::PROD deployment successful: ${{ github.ref_name }}"
+          else
+            echo "::error::PROD deployment FAILED. Consider rollback."
+            echo "Run: gh workflow run deploy-prod.yml -f action=rollback -f rollback_version=<previous-tag>"
+            exit 1
+          fi
+
+  # --- ROLLBACK JOB (manual trigger only) ---
+  rollback:
+    name: Rollback PROD
+    runs-on: ubuntu-latest
+    environment: production
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.action == 'rollback'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate rollback version
+        run: |
+          VERSION="${{ github.event.inputs.rollback_version }}"
+          if [[ -z "$VERSION" ]]; then
+            echo "ERROR: rollback_version is required for rollback action"
+            exit 1
+          fi
+          if ! git rev-parse --verify "$VERSION" >/dev/null 2>&1; then
+            echo "ERROR: Version '$VERSION' not found in git history"
+            exit 1
+          fi
+          echo "Rolling back to: $VERSION"
+
+      - name: Install Snowflake CLI
+        run: pip install snowflake-cli-labs
+
+      - name: Configure Snowflake connection
+        env:
+          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
+          SF_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
+          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
+        run: |
+          mkdir -p ~/.snowflake
+          cat > ~/.snowflake/connections.toml << EOF
+          [HAKKODAINC_PARTNER]
+          account = "${SF_ACCOUNT}"
+          user = "${SF_USER}"
+          password = "${SF_PASSWORD}"
+          warehouse = "PROD_WH"
+          EOF
+
+      - name: Execute rollback
+        run: |
+          chmod +x scripts/rollback.sh
+          bash scripts/rollback.sh \
+            --env=prod \
+            --version=${{ github.event.inputs.rollback_version }}

@@ -1,0 +1,21 @@
+Customer_ID,First_Name,Last_Name,Email_Address,Phone_Number,City,State_Province,Country,Created_Timestamp
+CUST-001,James,Anderson,james.anderson@email.com,416-555-0101,Toronto,Ontario,Canada,2023-01-05 08:12:34
+CUST-002,Sarah,Thompson,sarah.thompson@email.com,604-555-0202,Vancouver,British Columbia,Canada,2023-01-07 09:45:10
+CUST-003,Michael,Williams,michael.williams@email.com,514-555-0303,Montreal,Quebec,Canada,2023-01-10 11:20:55
+CUST-004,Emily,Brown,emily.brown@email.com,403-555-0404,Calgary,Alberta,Canada,2023-01-12 14:05:22
+CUST-005,David,Jones,david.jones@email.com,613-555-0505,Ottawa,Ontario,Canada,2023-01-15 16:30:47
+CUST-006,Jessica,Miller,jessica.miller@email.com,780-555-0606,Edmonton,Alberta,Canada,2023-01-18 10:15:33
+CUST-007,Christopher,Davis,christopher.davis@email.com,902-555-0707,Halifax,Nova Scotia,Canada,2023-01-20 13:40:18
+CUST-008,Ashley,Wilson,ashley.wilson@email.com,204-555-0808,Winnipeg,Manitoba,Canada,2023-01-22 15:55:09
+CUST-009,Matthew,Moore,matthew.moore@email.com,306-555-0909,Saskatoon,Saskatchewan,Canada,2023-01-25 08:25:41
+CUST-010,Amanda,Taylor,amanda.taylor@email.com,709-555-1010,St. John's,Newfoundland,Canada,2023-01-28 11:50:27
+CUST-011,Joshua,Jackson,joshua.jackson@email.com,250-555-1111,Victoria,British Columbia,Canada,2023-02-01 09:10:53
+CUST-012,Stephanie,White,stephanie.white@email.com,905-555-1212,Mississauga,Ontario,Canada,2023-02-03 14:35:16
+CUST-013,Daniel,Harris,daniel.harris@email.com,519-555-1313,London,Ontario,Canada,2023-02-06 16:00:44
+CUST-014,Nicole,Martin,nicole.martin@email.com,647-555-1414,Scarborough,Ontario,Canada,2023-02-08 10:45:30
+CUST-015,Andrew,Thompson,andrew.thompson@email.com,416-555-1515,North York,Ontario,Canada,2023-02-10 13:20:07
+CUST-016,Megan,Garcia,megan.garcia@email.com,604-555-1616,Burnaby,British Columbia,Canada,2023-02-13 15:40:52
+CUST-017,Ryan,Martinez,ryan.martinez@email.com,403-555-1717,Red Deer,Alberta,Canada,2023-02-15 08:55:19
+CUST-018,Lauren,Robinson,lauren.robinson@email.com,613-555-1818,Gatineau,Quebec,Canada,2023-02-18 11:15:36
+CUST-019,Kevin,Clark,kevin.clark@email.com,902-555-1919,Dartmouth,Nova Scotia,Canada,2023-02-20 14:30:48
+CUST-020,Rachel,Rodriguez,rachel.rodriguez@email.com,204-555-2020,Brandon,Manitoba,Canada,2023-02-22 16:50:05
