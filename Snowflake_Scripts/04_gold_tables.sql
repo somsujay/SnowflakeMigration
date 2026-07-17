@@ -13,16 +13,16 @@
 -- FactDailyTransaction
 -- Grain: one row per individual transaction per day.
 -- ----------------------------------------------------------
-CREATE OR REPLACE TABLE GOLD.FactDailyTransaction
+CREATE OR REPLACE TABLE GOLD.FACTDAILYTRANSACTION
 (
-    Date_Key            DATE          NOT NULL,
-    Customer_ID         VARCHAR(50)   NOT NULL,
-    Account_ID          VARCHAR(50)   NOT NULL,
-    Transaction_ID      VARCHAR(50)   NOT NULL,
-    Transaction_Type    VARCHAR(30),
-    Amount              DECIMAL(18,2)
+    DATE_KEY DATE NOT NULL,
+    CUSTOMER_ID VARCHAR(50) NOT NULL,
+    ACCOUNT_ID VARCHAR(50) NOT NULL,
+    TRANSACTION_ID VARCHAR(50) NOT NULL,
+    TRANSACTION_TYPE VARCHAR(30),
+    AMOUNT DECIMAL(18, 2)
 )
-CLUSTER BY (Date_Key);
+CLUSTER BY (DATE_KEY);
 
 
 -- ----------------------------------------------------------
@@ -36,16 +36,16 @@ CLUSTER BY (Date_Key);
 -- NULL in a grouping column indicates that dimension is
 -- not part of the aggregation key for that row.
 -- ----------------------------------------------------------
-CREATE OR REPLACE TABLE GOLD.FactDailyAgg
+CREATE OR REPLACE TABLE GOLD.FACTDAILYAGG
 (
-    Date_Key            DATE          NOT NULL,
-    Customer_ID         VARCHAR(50),
-    Account_ID          VARCHAR(50),
-    Transaction_Type    VARCHAR(30),
-    Total_Amount        DECIMAL(18,2),
-    Transaction_Count   INTEGER
+    DATE_KEY DATE NOT NULL,
+    CUSTOMER_ID VARCHAR(50),
+    ACCOUNT_ID VARCHAR(50),
+    TRANSACTION_TYPE VARCHAR(30),
+    TOTAL_AMOUNT DECIMAL(18, 2),
+    TRANSACTION_COUNT INTEGER
 )
-CLUSTER BY (Date_Key);
+CLUSTER BY (DATE_KEY);
 
 
 -- ----------------------------------------------------------
@@ -54,32 +54,33 @@ CLUSTER BY (Date_Key);
 -- Joins FactDailyTransaction with current DimCustomer records.
 -- Masking policies on underlying columns apply automatically.
 -- ----------------------------------------------------------
-CREATE OR REPLACE VIEW GOLD.MonthlySpendProfile AS
+CREATE OR REPLACE VIEW GOLD.MONTHLYSPENDPROFILE AS
 SELECT
-    c.Customer_ID,
-    c.First_Name,
-    c.Last_Name,
-    c.City,
-    c.State_Province,
-    DATE_TRUNC('MONTH', f.Date_Key)         AS Month_Key,
-    f.Transaction_Type,
-    COUNT(*)                                 AS Transaction_Count,
-    SUM(f.Amount)                            AS Total_Spend,
-    AVG(f.Amount)                            AS Avg_Transaction,
-    MIN(f.Amount)                            AS Min_Transaction,
-    MAX(f.Amount)                            AS Max_Transaction
-FROM GOLD.FactDailyTransaction f
-JOIN SILVER.DimCustomer c
-    ON f.Customer_ID = c.Customer_ID
-   AND c.Current_Flag = 'Y'
+    C.CUSTOMER_ID,
+    C.FIRST_NAME,
+    C.LAST_NAME,
+    C.CITY,
+    C.STATE_PROVINCE,
+    F.TRANSACTION_TYPE,
+    DATE_TRUNC('MONTH', F.DATE_KEY) AS MONTH_KEY,
+    COUNT(*) AS TRANSACTION_COUNT,
+    SUM(F.AMOUNT) AS TOTAL_SPEND,
+    AVG(F.AMOUNT) AS AVG_TRANSACTION,
+    MIN(F.AMOUNT) AS MIN_TRANSACTION,
+    MAX(F.AMOUNT) AS MAX_TRANSACTION
+FROM GOLD.FACTDAILYTRANSACTION AS F
+INNER JOIN SILVER.DIMCUSTOMER AS C
+    ON
+        F.CUSTOMER_ID = C.CUSTOMER_ID
+        AND C.CURRENT_FLAG = 'Y'
 GROUP BY
-    c.Customer_ID,
-    c.First_Name,
-    c.Last_Name,
-    c.City,
-    c.State_Province,
-    DATE_TRUNC('MONTH', f.Date_Key),
-    f.Transaction_Type;
+    C.CUSTOMER_ID,
+    C.FIRST_NAME,
+    C.LAST_NAME,
+    C.CITY,
+    C.STATE_PROVINCE,
+    DATE_TRUNC('MONTH', F.DATE_KEY),
+    F.TRANSACTION_TYPE;
 
 
 -- ----------------------------------------------------------
@@ -87,17 +88,17 @@ GROUP BY
 -- Monthly transaction type trends across the entire portfolio.
 -- Shows volume, spend, and customer reach per type over time.
 -- ----------------------------------------------------------
-CREATE OR REPLACE VIEW GOLD.TxnTypeTrend AS
+CREATE OR REPLACE VIEW GOLD.TXNTYPETREND AS
 SELECT
-    DATE_TRUNC('MONTH', f.Date_Key)         AS Month_Key,
-    f.Transaction_Type,
-    COUNT(*)                                 AS Transaction_Count,
-    SUM(f.Amount)                            AS Total_Amount,
-    AVG(f.Amount)                            AS Avg_Amount,
-    COUNT(DISTINCT f.Customer_ID)            AS Unique_Customers,
-    COUNT(DISTINCT f.Account_ID)             AS Unique_Accounts,
-    SUM(f.Amount) / NULLIF(COUNT(DISTINCT f.Customer_ID), 0) AS Avg_Spend_Per_Customer
-FROM GOLD.FactDailyTransaction f
+    F.TRANSACTION_TYPE,
+    DATE_TRUNC('MONTH', F.DATE_KEY) AS MONTH_KEY,
+    COUNT(*) AS TRANSACTION_COUNT,
+    SUM(F.AMOUNT) AS TOTAL_AMOUNT,
+    AVG(F.AMOUNT) AS AVG_AMOUNT,
+    COUNT(DISTINCT F.CUSTOMER_ID) AS UNIQUE_CUSTOMERS,
+    COUNT(DISTINCT F.ACCOUNT_ID) AS UNIQUE_ACCOUNTS,
+    SUM(F.AMOUNT) / NULLIF(COUNT(DISTINCT F.CUSTOMER_ID), 0) AS AVG_SPEND_PER_CUSTOMER
+FROM GOLD.FACTDAILYTRANSACTION AS F
 GROUP BY
-    DATE_TRUNC('MONTH', f.Date_Key),
-    f.Transaction_Type;
+    DATE_TRUNC('MONTH', F.DATE_KEY),
+    F.TRANSACTION_TYPE;

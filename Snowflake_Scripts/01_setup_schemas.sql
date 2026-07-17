@@ -8,10 +8,10 @@
    ============================================================ */
 
 CREATE SCHEMA IF NOT EXISTS BRONZE
-    COMMENT = 'Medallion Bronze layer: raw ingested staging data';
+COMMENT = 'Medallion Bronze layer: raw ingested staging data';
 
 CREATE SCHEMA IF NOT EXISTS SILVER
-    COMMENT = 'Medallion Silver layer: cleansed dimensions (SCD-1, SCD-2)';
+COMMENT = 'Medallion Silver layer: cleansed dimensions (SCD-1, SCD-2)';
 
 CREATE SCHEMA IF NOT EXISTS GOLD
-    COMMENT = 'Medallion Gold layer: business-ready fact tables and aggregates';
+COMMENT = 'Medallion Gold layer: business-ready fact tables and aggregates';

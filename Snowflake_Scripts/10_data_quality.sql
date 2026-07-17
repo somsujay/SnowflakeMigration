@@ -17,15 +17,15 @@
 -- Data Quality Audit Log Table
 -- ----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS GOVERNANCE.DATA_QUALITY_LOG (
-    log_id              INTEGER AUTOINCREMENT,
-    run_id              VARCHAR(50)       NOT NULL,
-    check_timestamp     TIMESTAMP_NTZ     DEFAULT CURRENT_TIMESTAMP(),
-    table_name          VARCHAR(100)      NOT NULL,
-    check_name          VARCHAR(100)      NOT NULL,
-    severity            VARCHAR(20)       NOT NULL,  -- ERROR, WARNING, INFO
-    records_failed      INTEGER           DEFAULT 0,
-    sample_ids          VARCHAR(2000),
-    details             VARCHAR(4000)
+    LOG_ID INTEGER AUTOINCREMENT,
+    RUN_ID VARCHAR(50) NOT NULL,
+    CHECK_TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    TABLE_NAME VARCHAR(100) NOT NULL,
+    CHECK_NAME VARCHAR(100) NOT NULL,
+    SEVERITY VARCHAR(20) NOT NULL,  -- ERROR, WARNING, INFO
+    RECORDS_FAILED INTEGER DEFAULT 0,
+    SAMPLE_IDS VARCHAR(2000),
+    DETAILS VARCHAR(4000)
 );
 
 
