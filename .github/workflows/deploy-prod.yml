@@ -101,7 +101,7 @@ jobs:
 
       - name: Run integration tests
         run: |
-          snow sql -c HAKKODAINC_PARTNER \
+          snow sql --account "$SNOWFLAKE_ACCOUNT" --user "$SNOWFLAKE_USER" --password "$SNOWFLAKE_PASSWORD" \
             --database SSOM_COCO_DB_PROD \
             --warehouse PROD_WH \
             -f tests/integration_test.sql
