@@ -13,6 +13,9 @@
 
 set -e
 
+# Skip Snowflake CLI file permissions check (required for CI runners)
+export SF_SKIP_TOKEN_FILE_PERMISSIONS_VERIFICATION=true
+
 # --- Resolve paths ---
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
@@ -66,6 +69,7 @@ echo ">> Executing smoke tests..."
 echo ""
 
 # Substitute placeholder and run
+chmod 0600 ~/.snowflake/connections.toml 2>/dev/null || true
 sed "s/{{DATABASE_NAME}}/${DB}/g" "$TEST_FILE" | \
     snow sql -c "$CONN" --database "$DB" --warehouse "$WH" -i
 

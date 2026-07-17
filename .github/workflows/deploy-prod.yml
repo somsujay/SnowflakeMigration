@@ -28,6 +28,12 @@ jobs:
     name: Deploy to PROD
     runs-on: ubuntu-latest
     environment: production
+    env:
+      SNOWFLAKE_DEFAULT_CONNECTION_NAME: HAKKODAINC_PARTNER
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_WAREHOUSE: PROD_WH
     if: >
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy')
@@ -37,22 +43,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install Snowflake CLI
-        run: pip install snowflake-cli-labs
-
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
         run: |
-          mkdir -p ~/.snowflake
-          cat > ~/.snowflake/connections.toml << EOF
-          [HAKKODAINC_PARTNER]
-          account = "${SF_ACCOUNT}"
-          user = "${SF_USER}"
-          password = "${SF_PASSWORD}"
-          warehouse = "PROD_WH"
-          EOF
+          pip install snowflake-cli-labs
+          rm -f ~/.snowflake/connections.toml
 
       - name: Deploy SQL scripts
         run: |
@@ -63,26 +56,19 @@ jobs:
     name: PROD Smoke Tests
     runs-on: ubuntu-latest
     needs: deploy
+    env:
+      SNOWFLAKE_DEFAULT_CONNECTION_NAME: HAKKODAINC_PARTNER
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_WAREHOUSE: PROD_WH
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Snowflake CLI
-        run: pip install snowflake-cli-labs
-
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
         run: |
-          mkdir -p ~/.snowflake
-          cat > ~/.snowflake/connections.toml << EOF
-          [HAKKODAINC_PARTNER]
-          account = "${SF_ACCOUNT}"
-          user = "${SF_USER}"
-          password = "${SF_PASSWORD}"
-          warehouse = "PROD_WH"
-          EOF
+          pip install snowflake-cli-labs
+          rm -f ~/.snowflake/connections.toml
 
       - name: Run smoke tests
         run: |
@@ -93,26 +79,19 @@ jobs:
     name: PROD Data Validation
     runs-on: ubuntu-latest
     needs: smoke-test
+    env:
+      SNOWFLAKE_DEFAULT_CONNECTION_NAME: HAKKODAINC_PARTNER
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_WAREHOUSE: PROD_WH
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Snowflake CLI
-        run: pip install snowflake-cli-labs
-
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
         run: |
-          mkdir -p ~/.snowflake
-          cat > ~/.snowflake/connections.toml << EOF
-          [HAKKODAINC_PARTNER]
-          account = "${SF_ACCOUNT}"
-          user = "${SF_USER}"
-          password = "${SF_PASSWORD}"
-          warehouse = "PROD_WH"
-          EOF
+          pip install snowflake-cli-labs
+          rm -f ~/.snowflake/connections.toml
 
       - name: Run integration tests
         run: |
@@ -142,6 +121,12 @@ jobs:
     name: Rollback PROD
     runs-on: ubuntu-latest
     environment: production
+    env:
+      SNOWFLAKE_DEFAULT_CONNECTION_NAME: HAKKODAINC_PARTNER
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_WAREHOUSE: PROD_WH
     if: >
       github.event_name == 'workflow_dispatch' &&
       github.event.inputs.action == 'rollback'
@@ -164,22 +149,9 @@ jobs:
           echo "Rolling back to: $VERSION"
 
       - name: Install Snowflake CLI
-        run: pip install snowflake-cli-labs
-
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
         run: |
-          mkdir -p ~/.snowflake
-          cat > ~/.snowflake/connections.toml << EOF
-          [HAKKODAINC_PARTNER]
-          account = "${SF_ACCOUNT}"
-          user = "${SF_USER}"
-          password = "${SF_PASSWORD}"
-          warehouse = "PROD_WH"
-          EOF
+          pip install snowflake-cli-labs
+          rm -f ~/.snowflake/connections.toml
 
       - name: Execute rollback
         run: |

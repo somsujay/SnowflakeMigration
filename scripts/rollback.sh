@@ -13,6 +13,9 @@
 
 set -euo pipefail
 
+# Skip Snowflake CLI file permissions check (required for CI runners)
+export SF_SKIP_TOKEN_FILE_PERMISSIONS_VERIFICATION=true
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="${PROJECT_DIR}/environments.yml"
@@ -107,6 +110,7 @@ deploy_file() {
     local desc="$2"
     if [[ -f "$file" ]]; then
         echo ">> Deploying: $(basename "$file") — ${desc}"
+        chmod 0600 ~/.snowflake/connections.toml 2>/dev/null || true
         snow sql -c "$CONN" --database "$DB" --warehouse "$WH" -f "$file"
         echo "   [OK]"
     fi
