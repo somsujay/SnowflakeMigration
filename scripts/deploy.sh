@@ -38,7 +38,7 @@ with os.fdopen(fd, 'w') as f:
 path = os.path.expanduser('~/.snowflake/connections.toml')
 fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as f:
-    f.write('[HAKKODAINC_PARTNER]\n')
+    f.write('[MY_TRIAL_ACCOUNT]\n')
     f.write('account = \"' + os.environ['SNOWFLAKE_ACCOUNT'] + '\"\n')
     f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
     f.write('authenticator = \"SNOWFLAKE_JWT\"\n')
@@ -53,7 +53,7 @@ os.makedirs(os.path.expanduser('~/.snowflake'), mode=0o700, exist_ok=True)
 path = os.path.expanduser('~/.snowflake/connections.toml')
 fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as f:
-    f.write('[HAKKODAINC_PARTNER]\n')
+    f.write('[MY_TRIAL_ACCOUNT]\n')
     f.write('account = \"' + os.environ['SNOWFLAKE_ACCOUNT'] + '\"\n')
     f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
     f.write('password = \"' + os.environ['SNOWFLAKE_PASSWORD'] + '\"\n')
