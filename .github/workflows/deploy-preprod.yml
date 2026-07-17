@@ -18,26 +18,19 @@ jobs:
     name: Deploy to Pre-PROD
     runs-on: ubuntu-latest
     environment: preprod
+    env:
+      SNOWFLAKE_DEFAULT_CONNECTION_NAME: HAKKODAINC_PARTNER
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_WAREHOUSE: SSOM_COCO_WH
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Snowflake CLI
-        run: pip install snowflake-cli-labs
-
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         run: |
-          mkdir -p ~/.snowflake
-          cat > ~/.snowflake/connections.toml << EOF
-          [HAKKODAINC_PARTNER]
-          account = "${SF_ACCOUNT}"
-          user = "${SF_USER}"
-          password = "${SF_PASSWORD}"
-          warehouse = "SSOM_COCO_WH"
-          EOF
+          pip install snowflake-cli-labs
+          rm -f ~/.snowflake/connections.toml
 
       - name: Deploy SQL scripts
         run: |
@@ -48,26 +41,19 @@ jobs:
     name: Smoke Tests
     runs-on: ubuntu-latest
     needs: deploy
+    env:
+      SNOWFLAKE_DEFAULT_CONNECTION_NAME: HAKKODAINC_PARTNER
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_WAREHOUSE: SSOM_COCO_WH
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Snowflake CLI
-        run: pip install snowflake-cli-labs
-
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         run: |
-          mkdir -p ~/.snowflake
-          cat > ~/.snowflake/connections.toml << EOF
-          [HAKKODAINC_PARTNER]
-          account = "${SF_ACCOUNT}"
-          user = "${SF_USER}"
-          password = "${SF_PASSWORD}"
-          warehouse = "SSOM_COCO_WH"
-          EOF
+          pip install snowflake-cli-labs
+          rm -f ~/.snowflake/connections.toml
 
       - name: Run smoke tests
         run: |
@@ -78,26 +64,19 @@ jobs:
     name: Regression Tests
     runs-on: ubuntu-latest
     needs: smoke-test
+    env:
+      SNOWFLAKE_DEFAULT_CONNECTION_NAME: HAKKODAINC_PARTNER
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_CONNECTIONS_HAKKODAINC_PARTNER_WAREHOUSE: SSOM_COCO_WH
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Snowflake CLI
-        run: pip install snowflake-cli-labs
-
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         run: |
-          mkdir -p ~/.snowflake
-          cat > ~/.snowflake/connections.toml << EOF
-          [HAKKODAINC_PARTNER]
-          account = "${SF_ACCOUNT}"
-          user = "${SF_USER}"
-          password = "${SF_PASSWORD}"
-          warehouse = "SSOM_COCO_WH"
-          EOF
+          pip install snowflake-cli-labs
+          rm -f ~/.snowflake/connections.toml
 
       - name: Run integration tests
         run: |
