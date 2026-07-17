@@ -18,6 +18,15 @@ set -euo pipefail
 # Skip Snowflake CLI file permissions check (required for CI runners)
 export SF_SKIP_TOKEN_FILE_PERMISSIONS_VERIFICATION=true
 
+# Build snow sql connection args (direct creds for CI, named connection for local)
+build_snow_conn_args() {
+    if [[ -n "${SNOWFLAKE_ACCOUNT:-}" && -n "${SNOWFLAKE_USER:-}" && -n "${SNOWFLAKE_PASSWORD:-}" ]]; then
+        echo "--account $SNOWFLAKE_ACCOUNT --user $SNOWFLAKE_USER --password $SNOWFLAKE_PASSWORD"
+    else
+        echo "-c $CONN"
+    fi
+}
+
 # --- Resolve paths ---
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
@@ -97,7 +106,7 @@ run_sql_file() {
     fi
 
     chmod 0600 ~/.snowflake/connections.toml 2>/dev/null || true
-    snow sql -c "$CONN" --database "$DB" --warehouse "$WH" -f "$file"
+    snow sql $(build_snow_conn_args) --database "$DB" --warehouse "$WH" -f "$file"
     echo "   [OK]"
     echo ""
 }
