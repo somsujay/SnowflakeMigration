@@ -58,6 +58,7 @@ with os.fdopen(fd, 'w') as f:
     f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
     f.write('password = \"' + os.environ['SNOWFLAKE_PASSWORD'] + '\"\n')
     f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'SSOM_COCO_WH') + '\"\n')
+print('Created:', path, 'with permissions', oct(os.stat(path).st_mode)[-3:])
 "
     else
         echo "ERROR: Either SNOWFLAKE_PRIVATE_KEY or SNOWFLAKE_PASSWORD must be set."
