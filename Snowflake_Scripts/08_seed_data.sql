@@ -27,7 +27,7 @@ CREATE OR REPLACE FILE FORMAT BRONZE.CSV_FORMAT
 
 /* ============================================================
    SINGLE SHARED NAMED STAGE (with Directory Table enabled)
-   
+
    All CSV files are organized by subdirectory path:
      @BRONZE.DATA_STAGE/customer/    → T_Customer files
      @BRONZE.DATA_STAGE/account/     → T_Account files
@@ -36,7 +36,7 @@ CREATE OR REPLACE FILE FORMAT BRONZE.CSV_FORMAT
 
 CREATE OR REPLACE STAGE BRONZE.DATA_STAGE
     FILE_FORMAT = BRONZE.CSV_FORMAT
-    DIRECTORY = (ENABLE = TRUE)
+    DIRECTORY = (ENABLE = TRUE) -- noqa: PRS
     COMMENT = 'Shared named stage for all Bronze CSV ingestion';
 
 

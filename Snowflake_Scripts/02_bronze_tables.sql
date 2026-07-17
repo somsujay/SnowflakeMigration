@@ -14,18 +14,18 @@
 -- Raw customer master data sourced from the OLTP system.
 -- Staged here prior to SCD-2 processing into SILVER.DimCustomer.
 -- ----------------------------------------------------------
-CREATE OR REPLACE TABLE BRONZE.T_Customer
+CREATE OR REPLACE TABLE BRONZE.T_CUSTOMER
 (
-    Customer_ID         VARCHAR(50)       NOT NULL,
-    First_Name          VARCHAR(50),
-    Last_Name           VARCHAR(50),
-    Email_Address       VARCHAR(100),
-    Phone_Number        VARCHAR(20),
-    City                VARCHAR(50),
-    State_Province      VARCHAR(50),
-    Country             VARCHAR(50),
-    Created_Timestamp   TIMESTAMP_NTZ     DEFAULT CURRENT_TIMESTAMP(),
-    _LOADED_AT          TIMESTAMP_NTZ     DEFAULT CURRENT_TIMESTAMP()
+    CUSTOMER_ID VARCHAR(50) NOT NULL,
+    FIRST_NAME VARCHAR(50),
+    LAST_NAME VARCHAR(50),
+    EMAIL_ADDRESS VARCHAR(100),
+    PHONE_NUMBER VARCHAR(20),
+    CITY VARCHAR(50),
+    STATE_PROVINCE VARCHAR(50),
+    COUNTRY VARCHAR(50),
+    CREATED_TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    _LOADED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
 
@@ -34,16 +34,16 @@ CREATE OR REPLACE TABLE BRONZE.T_Customer
 -- Raw account data sourced from the OLTP system.
 -- Staged here prior to SCD-1 upsert into SILVER.DimAccount.
 -- ----------------------------------------------------------
-CREATE OR REPLACE TABLE BRONZE.T_Account
+CREATE OR REPLACE TABLE BRONZE.T_ACCOUNT
 (
-    Account_ID          VARCHAR(50)       NOT NULL,
-    Customer_ID         VARCHAR(50)       NOT NULL,
-    Account_Type        VARCHAR(30),
-    Status              VARCHAR(20),
-    Currency_Code       VARCHAR(10),
-    Open_Date           DATE,
-    Created_Timestamp   TIMESTAMP_NTZ     DEFAULT CURRENT_TIMESTAMP(),
-    _LOADED_AT          TIMESTAMP_NTZ     DEFAULT CURRENT_TIMESTAMP()
+    ACCOUNT_ID VARCHAR(50) NOT NULL,
+    CUSTOMER_ID VARCHAR(50) NOT NULL,
+    ACCOUNT_TYPE VARCHAR(30),
+    STATUS VARCHAR(20),
+    CURRENCY_CODE VARCHAR(10),
+    OPEN_DATE DATE,
+    CREATED_TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    _LOADED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
 
@@ -52,13 +52,13 @@ CREATE OR REPLACE TABLE BRONZE.T_Account
 -- Raw transaction records sourced from the OLTP system.
 -- Staged here prior to loading into GOLD fact tables.
 -- ----------------------------------------------------------
-CREATE OR REPLACE TABLE BRONZE.T_Transaction
+CREATE OR REPLACE TABLE BRONZE.T_TRANSACTION
 (
-    Transaction_ID      VARCHAR(50)       NOT NULL,
-    Account_ID          VARCHAR(50)       NOT NULL,
-    Transaction_Date    TIMESTAMP_NTZ     NOT NULL,
-    Transaction_Type    VARCHAR(30),
-    Amount              DECIMAL(18,2),
-    Description         VARCHAR(255),
-    _LOADED_AT          TIMESTAMP_NTZ     DEFAULT CURRENT_TIMESTAMP()
+    TRANSACTION_ID VARCHAR(50) NOT NULL,
+    ACCOUNT_ID VARCHAR(50) NOT NULL,
+    TRANSACTION_DATE TIMESTAMP_NTZ NOT NULL,
+    TRANSACTION_TYPE VARCHAR(30),
+    AMOUNT DECIMAL(18, 2),
+    DESCRIPTION VARCHAR(255),
+    _LOADED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
