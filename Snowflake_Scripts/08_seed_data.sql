@@ -61,7 +61,7 @@ CREATE OR REPLACE STREAM BRONZE.STREAM_DATA_FILES
 -- Loads CSV files from @BRONZE.DATA_STAGE/customer/
 -- ----------------------------------------------------------
 CREATE OR REPLACE TASK BRONZE.TASK_LOAD_CUSTOMER
-    WAREHOUSE = 'SSOM_COCO_WH'
+    WAREHOUSE = 'COMPUTE_WH'
     SCHEDULE = 'USING CRON */5 * * * * America/Toronto'
     COMMENT = 'Auto-ingest customer CSVs from named stage'
     WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.STREAM_DATA_FILES')
@@ -78,7 +78,7 @@ FILE_FORMAT = (FORMAT_NAME = 'BRONZE.CSV_FORMAT');
 -- Loads CSV files from @BRONZE.DATA_STAGE/account/
 -- ----------------------------------------------------------
 CREATE OR REPLACE TASK BRONZE.TASK_LOAD_ACCOUNT
-    WAREHOUSE = 'SSOM_COCO_WH'
+    WAREHOUSE = 'COMPUTE_WH'
     SCHEDULE = 'USING CRON */5 * * * * America/Toronto'
     COMMENT = 'Auto-ingest account CSVs from named stage'
     WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.STREAM_DATA_FILES')
@@ -95,7 +95,7 @@ FILE_FORMAT = (FORMAT_NAME = 'BRONZE.CSV_FORMAT');
 -- Loads CSV files from @BRONZE.DATA_STAGE/transaction/
 -- ----------------------------------------------------------
 CREATE OR REPLACE TASK BRONZE.TASK_LOAD_TRANSACTION
-    WAREHOUSE = 'SSOM_COCO_WH'
+    WAREHOUSE = 'COMPUTE_WH'
     SCHEDULE = 'USING CRON */5 * * * * America/Toronto'
     COMMENT = 'Auto-ingest transaction CSVs from named stage'
     WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.STREAM_DATA_FILES')

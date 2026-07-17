@@ -15,9 +15,9 @@
 # were already removed, and that is expected behavior.
 
 # --- Configuration ---
-CONN="MY_TRIAL_ACCOUNT"
-DB="SSOM_COCO_DB"
-WH="SSOM_COCO_WH"
+CONN="${SNOWFLAKE_CONNECTION:-MY_TRIAL_ACCOUNT}"
+DB="${SNOWFLAKE_DATABASE:-SSOM_COCO_DB}"
+WH="${SNOWFLAKE_WAREHOUSE:-COMPUTE_WH}"
 
 # --- Safety Check ---
 if [ "$1" != "--confirm" ]; then

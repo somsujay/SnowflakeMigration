@@ -34,7 +34,7 @@ with os.fdopen(fd, 'w') as f:
     f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
     f.write('authenticator = \"SNOWFLAKE_JWT\"\n')
     f.write('private_key_path = \"' + key_path + '\"\n')
-    f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'SSOM_COCO_WH') + '\"\n')
+    f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH') + '\"\n')
 "
     elif [[ -n "${SNOWFLAKE_PASSWORD:-}" ]]; then
         python3 -c "
@@ -47,7 +47,7 @@ with os.fdopen(fd, 'w') as f:
     f.write('account = \"' + os.environ['SNOWFLAKE_ACCOUNT'] + '\"\n')
     f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
     f.write('password = \"' + os.environ['SNOWFLAKE_PASSWORD'] + '\"\n')
-    f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'SSOM_COCO_WH') + '\"\n')
+    f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH') + '\"\n')
 "
     fi
 fi
