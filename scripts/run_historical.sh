@@ -21,7 +21,7 @@
 set -e
 
 # --- Configuration ---
-CONN="HAKKODAINC_PARTNER"
+CONN="MY_TRIAL_ACCOUNT"
 DB="SSOM_COCO_DB"
 WH="SSOM_COCO_WH"
 

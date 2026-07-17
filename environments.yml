@@ -6,19 +6,19 @@
 dev:
   database: SSOM_COCO_DB
   warehouse: SSOM_COCO_WH
-  connection: HAKKODAINC_PARTNER
+  connection: MY_TRIAL_ACCOUNT
 
 qa:
   database: SSOM_COCO_DB_QA
   warehouse: SSOM_COCO_WH
-  connection: HAKKODAINC_PARTNER
+  connection: MY_TRIAL_ACCOUNT
 
 preprod:
   database: SSOM_COCO_DB_PREPROD
   warehouse: SSOM_COCO_WH
-  connection: HAKKODAINC_PARTNER
+  connection: MY_TRIAL_ACCOUNT
 
 prod:
   database: SSOM_COCO_DB_PROD
   warehouse: PROD_WH
-  connection: HAKKODAINC_PARTNER
+  connection: MY_TRIAL_ACCOUNT

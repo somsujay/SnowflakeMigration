@@ -19,26 +19,56 @@ set -euo pipefail
 export SF_SKIP_TOKEN_FILE_PERMISSIONS_VERIFICATION=true
 
 # In CI, create Snowflake CLI config from env vars with strict permissions
-if [[ -n "${SNOWFLAKE_ACCOUNT:-}" && -n "${SNOWFLAKE_USER:-}" && -n "${SNOWFLAKE_PASSWORD:-}" ]]; then
+if [[ -n "${SNOWFLAKE_ACCOUNT:-}" && -n "${SNOWFLAKE_USER:-}" ]]; then
     echo ">> Configuring Snowflake connection from environment variables..."
-    python3 -c "
+
+    # Write private key file if provided
+    if [[ -n "${SNOWFLAKE_PRIVATE_KEY:-}" ]]; then
+        python3 -c "
+import os
+os.makedirs(os.path.expanduser('~/.snowflake'), mode=0o700, exist_ok=True)
+
+# Write private key
+key_path = os.path.expanduser('~/.snowflake/ci_key.p8')
+fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, 'w') as f:
+    f.write(os.environ['SNOWFLAKE_PRIVATE_KEY'])
+
+# Write connections.toml with key pair auth
+path = os.path.expanduser('~/.snowflake/connections.toml')
+fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, 'w') as f:
+    f.write('[MY_TRIAL_ACCOUNT]\n')
+    f.write('account = \"' + os.environ['SNOWFLAKE_ACCOUNT'] + '\"\n')
+    f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
+    f.write('authenticator = \"SNOWFLAKE_JWT\"\n')
+    f.write('private_key_path = \"' + key_path + '\"\n')
+    f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'SSOM_COCO_WH') + '\"\n')
+print('Created:', path, 'with key pair auth')
+"
+    elif [[ -n "${SNOWFLAKE_PASSWORD:-}" ]]; then
+        python3 -c "
 import os
 os.makedirs(os.path.expanduser('~/.snowflake'), mode=0o700, exist_ok=True)
 path = os.path.expanduser('~/.snowflake/connections.toml')
 fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as f:
-    f.write('[HAKKODAINC_PARTNER]\n')
+    f.write('[MY_TRIAL_ACCOUNT]\n')
     f.write('account = \"' + os.environ['SNOWFLAKE_ACCOUNT'] + '\"\n')
     f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
     f.write('password = \"' + os.environ['SNOWFLAKE_PASSWORD'] + '\"\n')
     f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'SSOM_COCO_WH') + '\"\n')
 print('Created:', path, 'with permissions', oct(os.stat(path).st_mode)[-3:])
 "
+    else
+        echo "ERROR: Either SNOWFLAKE_PRIVATE_KEY or SNOWFLAKE_PASSWORD must be set."
+        exit 1
+    fi
 else
-    echo ">> SNOWFLAKE_ACCOUNT/USER/PASSWORD env vars not set, using existing connection config"
+    echo ">> SNOWFLAKE_ACCOUNT/USER env vars not set, using existing connection config"
     if [[ ! -f ~/.snowflake/connections.toml ]]; then
         echo "ERROR: No ~/.snowflake/connections.toml found and no SNOWFLAKE_* env vars set."
-        echo "Set SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD environment variables."
+        echo "Set SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, and SNOWFLAKE_PRIVATE_KEY environment variables."
         exit 1
     fi
 fi
