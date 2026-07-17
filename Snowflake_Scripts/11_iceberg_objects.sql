@@ -21,7 +21,7 @@
 -- Parquet file format for Iceberg/Parquet ingestion
 -- ----------------------------------------------------------
 CREATE OR REPLACE FILE FORMAT BRONZE.PARQUET_FORMAT
-    TYPE = PARQUET;
+TYPE = PARQUET;
 
 
 /* ============================================================
