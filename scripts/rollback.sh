@@ -16,7 +16,7 @@ set -euo pipefail
 # Skip Snowflake CLI file permissions check (required for CI runners)
 export SF_SKIP_TOKEN_FILE_PERMISSIONS_VERIFICATION=true
 
-# In CI, create connections.toml from env vars with strict permissions
+# In CI, create Snowflake CLI config from env vars with strict permissions
 if [[ -n "${SNOWFLAKE_ACCOUNT:-}" && -n "${SNOWFLAKE_USER:-}" && -n "${SNOWFLAKE_PASSWORD:-}" ]]; then
     python3 -c "
 import os

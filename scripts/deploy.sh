@@ -18,8 +18,9 @@ set -euo pipefail
 # Skip Snowflake CLI file permissions check (required for CI runners)
 export SF_SKIP_TOKEN_FILE_PERMISSIONS_VERIFICATION=true
 
-# In CI, create connections.toml from env vars with strict permissions
+# In CI, create Snowflake CLI config from env vars with strict permissions
 if [[ -n "${SNOWFLAKE_ACCOUNT:-}" && -n "${SNOWFLAKE_USER:-}" && -n "${SNOWFLAKE_PASSWORD:-}" ]]; then
+    echo ">> Configuring Snowflake connection from environment variables..."
     python3 -c "
 import os
 os.makedirs(os.path.expanduser('~/.snowflake'), mode=0o700, exist_ok=True)
@@ -31,7 +32,15 @@ with os.fdopen(fd, 'w') as f:
     f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
     f.write('password = \"' + os.environ['SNOWFLAKE_PASSWORD'] + '\"\n')
     f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'SSOM_COCO_WH') + '\"\n')
+print('Created:', path, 'with permissions', oct(os.stat(path).st_mode)[-3:])
 "
+else
+    echo ">> SNOWFLAKE_ACCOUNT/USER/PASSWORD env vars not set, using existing connection config"
+    if [[ ! -f ~/.snowflake/connections.toml ]]; then
+        echo "ERROR: No ~/.snowflake/connections.toml found and no SNOWFLAKE_* env vars set."
+        echo "Set SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD environment variables."
+        exit 1
+    fi
 fi
 
 # --- Resolve paths ---
