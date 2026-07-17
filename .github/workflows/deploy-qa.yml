@@ -18,20 +18,15 @@ jobs:
     name: Deploy to QA
     runs-on: ubuntu-latest
     environment: qa
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Snowflake CLI
         run: pip install snowflake-cli-labs
-
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-        run: |
-          mkdir -p ~/.snowflake && chmod 0700 ~/.snowflake
-          (umask 077 && printf '[HAKKODAINC_PARTNER]\naccount = "%s"\nuser = "%s"\npassword = "%s"\nwarehouse = "SSOM_COCO_WH"\n' "$SF_ACCOUNT" "$SF_USER" "$SF_PASSWORD" > ~/.snowflake/connections.toml)
 
       - name: Deploy SQL scripts
         run: |
@@ -42,20 +37,15 @@ jobs:
     name: Smoke Tests
     runs-on: ubuntu-latest
     needs: deploy
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Snowflake CLI
         run: pip install snowflake-cli-labs
-
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-        run: |
-          mkdir -p ~/.snowflake && chmod 0700 ~/.snowflake
-          (umask 077 && printf '[HAKKODAINC_PARTNER]\naccount = "%s"\nuser = "%s"\npassword = "%s"\nwarehouse = "SSOM_COCO_WH"\n' "$SF_ACCOUNT" "$SF_USER" "$SF_PASSWORD" > ~/.snowflake/connections.toml)
 
       - name: Run smoke tests
         run: |
@@ -66,24 +56,19 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     needs: smoke-test
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Snowflake CLI
         run: pip install snowflake-cli-labs
 
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-        run: |
-          mkdir -p ~/.snowflake && chmod 0700 ~/.snowflake
-          (umask 077 && printf '[HAKKODAINC_PARTNER]\naccount = "%s"\nuser = "%s"\npassword = "%s"\nwarehouse = "SSOM_COCO_WH"\n' "$SF_ACCOUNT" "$SF_USER" "$SF_PASSWORD" > ~/.snowflake/connections.toml)
-
       - name: Run integration tests
         run: |
-          snow sql -c HAKKODAINC_PARTNER \
+          snow sql --account "$SNOWFLAKE_ACCOUNT" --user "$SNOWFLAKE_USER" --password "$SNOWFLAKE_PASSWORD" \
             --database SSOM_COCO_DB_QA \
             --warehouse SSOM_COCO_WH \
             -f tests/integration_test.sql

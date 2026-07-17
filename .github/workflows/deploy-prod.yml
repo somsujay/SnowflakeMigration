@@ -28,6 +28,10 @@ jobs:
     name: Deploy to PROD
     runs-on: ubuntu-latest
     environment: production
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
     if: >
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy')
@@ -39,15 +43,6 @@ jobs:
       - name: Install Snowflake CLI
         run: pip install snowflake-cli-labs
 
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
-        run: |
-          mkdir -p ~/.snowflake && chmod 0700 ~/.snowflake
-          (umask 077 && printf '[HAKKODAINC_PARTNER]\naccount = "%s"\nuser = "%s"\npassword = "%s"\nwarehouse = "PROD_WH"\n' "$SF_ACCOUNT" "$SF_USER" "$SF_PASSWORD" > ~/.snowflake/connections.toml)
-
       - name: Deploy SQL scripts
         run: |
           chmod +x scripts/deploy.sh
@@ -57,20 +52,15 @@ jobs:
     name: PROD Smoke Tests
     runs-on: ubuntu-latest
     needs: deploy
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Snowflake CLI
         run: pip install snowflake-cli-labs
-
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
-        run: |
-          mkdir -p ~/.snowflake && chmod 0700 ~/.snowflake
-          (umask 077 && printf '[HAKKODAINC_PARTNER]\naccount = "%s"\nuser = "%s"\npassword = "%s"\nwarehouse = "PROD_WH"\n' "$SF_ACCOUNT" "$SF_USER" "$SF_PASSWORD" > ~/.snowflake/connections.toml)
 
       - name: Run smoke tests
         run: |
@@ -81,24 +71,19 @@ jobs:
     name: PROD Data Validation
     runs-on: ubuntu-latest
     needs: smoke-test
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Snowflake CLI
         run: pip install snowflake-cli-labs
 
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
-        run: |
-          mkdir -p ~/.snowflake && chmod 0700 ~/.snowflake
-          (umask 077 && printf '[HAKKODAINC_PARTNER]\naccount = "%s"\nuser = "%s"\npassword = "%s"\nwarehouse = "PROD_WH"\n' "$SF_ACCOUNT" "$SF_USER" "$SF_PASSWORD" > ~/.snowflake/connections.toml)
-
       - name: Run integration tests
         run: |
-          snow sql -c HAKKODAINC_PARTNER \
+          snow sql --account "$SNOWFLAKE_ACCOUNT" --user "$SNOWFLAKE_USER" --password "$SNOWFLAKE_PASSWORD" \
             --database SSOM_COCO_DB_PROD \
             --warehouse PROD_WH \
             -f tests/integration_test.sql
@@ -124,6 +109,10 @@ jobs:
     name: Rollback PROD
     runs-on: ubuntu-latest
     environment: production
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
     if: >
       github.event_name == 'workflow_dispatch' &&
       github.event.inputs.action == 'rollback'
@@ -147,15 +136,6 @@ jobs:
 
       - name: Install Snowflake CLI
         run: pip install snowflake-cli-labs
-
-      - name: Configure Snowflake connection
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
-          SF_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
-        run: |
-          mkdir -p ~/.snowflake && chmod 0700 ~/.snowflake
-          (umask 077 && printf '[HAKKODAINC_PARTNER]\naccount = "%s"\nuser = "%s"\npassword = "%s"\nwarehouse = "PROD_WH"\n' "$SF_ACCOUNT" "$SF_USER" "$SF_PASSWORD" > ~/.snowflake/connections.toml)
 
       - name: Execute rollback
         run: |
