@@ -40,6 +40,10 @@ with os.fdopen(fd, 'w') as f:
         python3 -c "
 import os
 os.makedirs(os.path.expanduser('~/.snowflake'), mode=0o700, exist_ok=True)
+key_path = os.path.expanduser('~/.snowflake/ci_key.p8')
+fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, 'w') as f:
+    f.write(os.environ['SNOWFLAKE_PRIVATE_KEY'])
 path = os.path.expanduser('~/.snowflake/connections.toml')
 fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as f:
