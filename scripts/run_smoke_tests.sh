@@ -106,7 +106,7 @@ echo ""
 
 # Substitute placeholder and run
 sed "s/{{DATABASE_NAME}}/${DB}/g" "$TEST_FILE" | \
-    snow sql $(build_snow_conn_args) --database "$DB" --warehouse "$WH" -i
+    snow sql -c "$CONN" --database "$DB" --warehouse "$WH" -i
 
 EXIT_CODE=$?
 
