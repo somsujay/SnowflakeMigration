@@ -66,9 +66,24 @@ jobs:
       - name: Install Snowflake CLI
         run: pip install snowflake-cli-labs
 
+      - name: Configure Snowflake connection
+        run: |
+          python3 -c "
+          import os
+          os.makedirs(os.path.expanduser('~/.snowflake'), mode=0o700, exist_ok=True)
+          path = os.path.expanduser('~/.snowflake/connections.toml')
+          fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+          with os.fdopen(fd, 'w') as f:
+              f.write('[HAKKODAINC_PARTNER]\n')
+              f.write('account = \"' + os.environ['SNOWFLAKE_ACCOUNT'] + '\"\n')
+              f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
+              f.write('password = \"' + os.environ['SNOWFLAKE_PASSWORD'] + '\"\n')
+              f.write('warehouse = \"SSOM_COCO_WH\"\n')
+          "
+
       - name: Run integration tests
         run: |
-          snow sql --account "$SNOWFLAKE_ACCOUNT" --user "$SNOWFLAKE_USER" --password "$SNOWFLAKE_PASSWORD" \
+          snow sql -c HAKKODAINC_PARTNER \
             --database SSOM_COCO_DB_QA \
             --warehouse SSOM_COCO_WH \
             -f tests/integration_test.sql
