@@ -32,6 +32,7 @@ jobs:
       SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
       SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
       SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
+      SNOWFLAKE_WAREHOUSE: PROD_WH
     if: >
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy')
@@ -56,6 +57,7 @@ jobs:
       SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
       SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
       SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
+      SNOWFLAKE_WAREHOUSE: PROD_WH
     steps:
       - uses: actions/checkout@v4
 
@@ -75,11 +77,27 @@ jobs:
       SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
       SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
       SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
+      SNOWFLAKE_WAREHOUSE: PROD_WH
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Snowflake CLI
         run: pip install snowflake-cli-labs
+
+      - name: Configure Snowflake connection
+        run: |
+          python3 -c "
+          import os
+          os.makedirs(os.path.expanduser('~/.snowflake'), mode=0o700, exist_ok=True)
+          path = os.path.expanduser('~/.snowflake/connections.toml')
+          fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+          with os.fdopen(fd, 'w') as f:
+              f.write('[HAKKODAINC_PARTNER]\n')
+              f.write('account = \"' + os.environ['SNOWFLAKE_ACCOUNT'] + '\"\n')
+              f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
+              f.write('password = \"' + os.environ['SNOWFLAKE_PASSWORD'] + '\"\n')
+              f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'PROD_WH') + '\"\n')
+          "
 
       - name: Run integration tests
         run: |
@@ -113,6 +131,7 @@ jobs:
       SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_PROD_ACCOUNT }}
       SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_PROD_USER }}
       SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PROD_PASSWORD }}
+      SNOWFLAKE_WAREHOUSE: PROD_WH
     if: >
       github.event_name == 'workflow_dispatch' &&
       github.event.inputs.action == 'rollback'
