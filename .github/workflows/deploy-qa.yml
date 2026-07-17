@@ -83,12 +83,12 @@ jobs:
               f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
               f.write('authenticator = \"SNOWFLAKE_JWT\"\n')
               f.write('private_key_path = \"' + key_path + '\"\n')
-              f.write('warehouse = \"SSOM_COCO_WH\"\n')
+              f.write('warehouse = \"COMPUTE_WH\"\n')
           "
 
       - name: Run integration tests
         run: |
           snow sql -c MY_TRIAL_ACCOUNT \
             --database SSOM_COCO_DB_QA \
-            --warehouse SSOM_COCO_WH \
+            --warehouse COMPUTE_WH \
             -f tests/integration_test.sql

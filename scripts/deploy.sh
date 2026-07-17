@@ -43,13 +43,21 @@ with os.fdopen(fd, 'w') as f:
     f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
     f.write('authenticator = \"SNOWFLAKE_JWT\"\n')
     f.write('private_key_path = \"' + key_path + '\"\n')
-    f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'SSOM_COCO_WH') + '\"\n')
+    f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH') + '\"\n')
 print('Created:', path, 'with key pair auth')
 "
     elif [[ -n "${SNOWFLAKE_PASSWORD:-}" ]]; then
         python3 -c "
 import os
 os.makedirs(os.path.expanduser('~/.snowflake'), mode=0o700, exist_ok=True)
+
+# Write private key
+key_path = os.path.expanduser('~/.snowflake/ci_key.p8')
+fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, 'w') as f:
+    f.write(os.environ['SNOWFLAKE_PRIVATE_KEY'])
+
+# Write connections.toml with key pair auth
 path = os.path.expanduser('~/.snowflake/connections.toml')
 fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as f:
