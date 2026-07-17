@@ -64,8 +64,8 @@ SHOW STAGES IN SCHEMA BRONZE;
 SELECT 'Masking policies' AS test_name,
        COUNT(*) AS policy_count,
        IFF(COUNT(*) >= 4, 'PASS', 'FAIL') AS result
-FROM INFORMATION_SCHEMA.MASKING_POLICIES
-WHERE POLICY_SCHEMA = 'GOVERNANCE';
+FROM TABLE(INFORMATION_SCHEMA.POLICY_REFERENCES(REF_ENTITY_DOMAIN => 'DATABASE', REF_ENTITY_NAME => CURRENT_DATABASE()))
+WHERE POLICY_KIND = 'MASKING_POLICY';
 
 -- ----------------------------------------------------------
 -- TEST 6: Verify data quality objects
