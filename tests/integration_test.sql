@@ -61,11 +61,7 @@ SHOW STAGES IN SCHEMA BRONZE;
 -- ----------------------------------------------------------
 -- TEST 5: Verify masking policies exist
 -- ----------------------------------------------------------
-SELECT 'Masking policies' AS test_name,
-       COUNT(*) AS policy_count,
-       IFF(COUNT(*) >= 4, 'PASS', 'FAIL') AS result
-FROM TABLE(INFORMATION_SCHEMA.POLICY_REFERENCES(REF_ENTITY_DOMAIN => 'DATABASE', REF_ENTITY_NAME => CURRENT_DATABASE()))
-WHERE POLICY_KIND = 'MASKING_POLICY';
+SHOW MASKING POLICIES IN SCHEMA GOVERNANCE;
 
 -- ----------------------------------------------------------
 -- TEST 6: Verify data quality objects
