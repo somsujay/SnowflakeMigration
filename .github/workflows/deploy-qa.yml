@@ -4,10 +4,11 @@ on:
   push:
     branches: ['release/*']
     paths:
-      - 'Snowflake_Scripts/**'
+      - 'banking/**'
       - 'scripts/**'
       - 'tests/**'
       - 'environments.yml'
+      - 'schemachange-config.yml'
 
 concurrency:
   group: deploy-qa
@@ -25,13 +26,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Snowflake CLI
-        run: pip install snowflake-cli-labs
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Deploy SQL scripts
+      - name: Install dependencies
+        run: pip install schemachange snowflake-cli-labs
+
+      - name: Deploy with schemachange
         run: |
-          chmod +x scripts/deploy.sh
-          bash scripts/deploy.sh --env=qa
+          mkdir -p ~/.snowflake && chmod 700 ~/.snowflake
+          echo "$SNOWFLAKE_PRIVATE_KEY" > ~/.snowflake/ci_key.p8
+          chmod 600 ~/.snowflake/ci_key.p8
+          chmod +x scripts/deploy_schemachange.sh
+          bash scripts/deploy_schemachange.sh --env=qa
 
   smoke-test:
     name: Smoke Tests

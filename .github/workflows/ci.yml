@@ -4,10 +4,11 @@ on:
   pull_request:
     branches: [develop, 'release/*', main]
     paths:
-      - 'Snowflake_Scripts/**'
+      - 'banking/**'
       - 'scripts/**'
       - 'tests/**'
       - 'environments.yml'
+      - 'schemachange-config.yml'
       - '.sqlfluff'
 
 jobs:
@@ -27,7 +28,7 @@ jobs:
 
       - name: Run sqlfluff lint
         run: |
-          sqlfluff lint Snowflake_Scripts/ \
+          sqlfluff lint banking/ \
             --dialect snowflake \
             --config .sqlfluff
 
@@ -39,13 +40,19 @@ jobs:
 
       - name: Check scripts are executable-ready
         run: |
-          echo ">> Verifying all SQL scripts exist and are non-empty..."
-          for f in Snowflake_Scripts/0*.sql Snowflake_Scripts/1*.sql; do
+          echo ">> Verifying migration scripts exist and follow naming conventions..."
+          V_COUNT=$(ls banking/V*.sql 2>/dev/null | wc -l)
+          if [[ "$V_COUNT" -eq 0 ]]; then
+            echo "ERROR: No versioned migration scripts (V*.sql) found"
+            exit 1
+          fi
+          echo "   Found $V_COUNT versioned migration(s)"
+          for f in banking/V*.sql banking/R*.sql banking/A*.sql; do
             if [[ ! -s "$f" ]]; then
-              echo "ERROR: $f is missing or empty"
+              echo "ERROR: $f is empty"
               exit 1
             fi
-            echo "   OK: $f"
+            echo "   OK: $(basename $f)"
           done
 
       - name: Validate environments.yml structure
