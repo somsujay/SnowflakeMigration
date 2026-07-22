@@ -171,7 +171,7 @@ echo "[Phase 2 COMPLETE]"
 # ============================================================
 header "Phase 3: ETL - Re-run Daily_ETL_Run() with incremental data"
 
-run_sql "CALL ${DB}.PUBLIC.Daily_ETL_Run();"
+run_sql "CALL ${DB}.GOLD.Daily_ETL_Run();"
 
 echo ">> Verifying final Silver/Gold row counts..."
 run_sql "SELECT 'DimCustomer' AS table_name, COUNT(*) AS row_count FROM SILVER.DimCustomer
