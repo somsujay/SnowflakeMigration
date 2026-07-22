@@ -84,7 +84,7 @@ fi
 # --- Resolve paths ---
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-SQL_DIR="${PROJECT_DIR}/Snowflake_Scripts"
+SQL_DIR="${PROJECT_DIR}/banking"
 ENV_FILE="${PROJECT_DIR}/environments.yml"
 
 # --- Parse arguments ---
