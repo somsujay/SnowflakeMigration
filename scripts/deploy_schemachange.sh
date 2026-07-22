@@ -89,29 +89,31 @@ echo "Dry-run:      ${DRY_RUN}"
 echo ""
 
 # --- Build schemachange command ---
-SCHEMACHANGE_CMD="schemachange deploy"
-SCHEMACHANGE_CMD+=" --root-folder ${PROJECT_DIR}/banking"
-SCHEMACHANGE_CMD+=" --snowflake-account ${SNOWFLAKE_ACCOUNT}"
-SCHEMACHANGE_CMD+=" --snowflake-user ${SNOWFLAKE_USER}"
-SCHEMACHANGE_CMD+=" --snowflake-role ${SNOWFLAKE_ROLE}"
-SCHEMACHANGE_CMD+=" --snowflake-warehouse ${SNOWFLAKE_WAREHOUSE}"
-SCHEMACHANGE_CMD+=" --snowflake-database ${DB}"
-SCHEMACHANGE_CMD+=" --change-history-table ${DB}.METADATA.SCHEMACHANGE_HISTORY"
-SCHEMACHANGE_CMD+=" --vars '{\"database\": \"${DB}\", \"warehouse\": \"${WH}\", \"role\": \"${SNOWFLAKE_ROLE}\", \"environment\": \"${ENV}\"}'"
-SCHEMACHANGE_CMD+=" --create-change-history-table"
-SCHEMACHANGE_CMD+=" --autocommit"
+VARS_JSON="{\"database\": \"${DB}\", \"warehouse\": \"${WH}\", \"role\": \"${SNOWFLAKE_ROLE}\", \"environment\": \"${ENV}\"}"
 
-# Authentication via private key
-SCHEMACHANGE_CMD+=" --snowflake-private-key-path ${SNOWFLAKE_PRIVATE_KEY_PATH}"
+SCHEMACHANGE_ARGS=(
+    deploy
+    --root-folder "${PROJECT_DIR}/banking"
+    --snowflake-account "${SNOWFLAKE_ACCOUNT}"
+    --snowflake-user "${SNOWFLAKE_USER}"
+    --snowflake-role "${SNOWFLAKE_ROLE}"
+    --snowflake-warehouse "${SNOWFLAKE_WAREHOUSE}"
+    --snowflake-database "${DB}"
+    --change-history-table "${DB}.METADATA.SCHEMACHANGE_HISTORY"
+    --vars "${VARS_JSON}"
+    --create-change-history-table
+    --autocommit
+    --snowflake-private-key-path "${SNOWFLAKE_PRIVATE_KEY_PATH}"
+)
 
 if [[ "$DRY_RUN" == "true" ]]; then
-    SCHEMACHANGE_CMD+=" --dry-run"
+    SCHEMACHANGE_ARGS+=(--dry-run)
 fi
 
 # --- Execute ---
 echo ">> Running schemachange..."
 echo ""
-eval "$SCHEMACHANGE_CMD"
+schemachange "${SCHEMACHANGE_ARGS[@]}"
 
 # --- Summary ---
 echo ""
