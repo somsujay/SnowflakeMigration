@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project deploys a Teradata-to-Snowflake migration pipeline with a Bronze/Silver/Gold medallion architecture. All scripts are parameterized via environment variables with sensible defaults.
+This project deploys a Teradata-to-Snowflake migration pipeline with a Bronze/Silver/Gold medallion architecture. Schema changes are managed by **schemachange** — an open-source, version-controlled database migration tool for Snowflake. All migrations live in the `banking/` directory and are parameterized via Jinja2 templating for multi-environment support.
 
 ---
 
@@ -10,9 +10,14 @@ This project deploys a Teradata-to-Snowflake migration pipeline with a Bronze/Si
 
 ### Local Development
 
-1. **Snowflake CLI** (`snow`): `pip install snowflake-cli-labs`
-2. **Connection config**: `~/.snowflake/connections.toml` must contain a `[MY_TRIAL_ACCOUNT]` section
-3. **Key-pair auth**: RSA private key at the path specified in `connections.toml`
+1. **Python 3.11+** with dependencies: `pip install -r requirements.txt`
+2. **Snowflake CLI** (`snow`): `pip install snowflake-cli-labs`
+3. **Key-pair auth**: RSA private key at `~/.snowflake/ci_key.p8` (or set `SNOWFLAKE_PRIVATE_KEY_PATH`)
+4. **Environment variables**:
+   ```bash
+   export SNOWFLAKE_ACCOUNT=<your_account>
+   export SNOWFLAKE_USER=<your_user>
+   ```
 
 ### CI/CD (GitHub Actions)
 
@@ -47,14 +52,16 @@ All environments are defined in `environments.yml`:
 All scripts respect these environment variables (with defaults shown):
 
 ```bash
-SNOWFLAKE_CONNECTION=MY_TRIAL_ACCOUNT
-SNOWFLAKE_DATABASE=SSOM_COCO_DB
+SNOWFLAKE_ACCOUNT=<your_account>
+SNOWFLAKE_USER=<your_user>
+SNOWFLAKE_PRIVATE_KEY_PATH=~/.snowflake/ci_key.p8
+SNOWFLAKE_ROLE=SYSADMIN
 SNOWFLAKE_WAREHOUSE=COMPUTE_WH
 ```
 
 Example override:
 ```bash
-SNOWFLAKE_WAREHOUSE=LARGE_WH bash scripts/create_objects.sh
+SNOWFLAKE_WAREHOUSE=LARGE_WH bash scripts/deploy_schemachange.sh --env=dev
 ```
 
 ---
@@ -66,21 +73,21 @@ All scripts are located in the `scripts/` directory. Run from the project root.
 ### Initial Deployment
 
 ```bash
-# Deploy all SQL objects (schemas, tables, procedures, policies)
-bash scripts/create_objects.sh
+# Deploy all migrations to dev (first run creates the change history table automatically)
+bash scripts/deploy_schemachange.sh --env=dev
 ```
 
 ### Environment-Aware Deployment (CI/CD)
 
 ```bash
 # Deploy to a specific environment
-bash scripts/deploy.sh --env=dev
-bash scripts/deploy.sh --env=qa
-bash scripts/deploy.sh --env=preprod
-bash scripts/deploy.sh --env=prod
+bash scripts/deploy_schemachange.sh --env=dev
+bash scripts/deploy_schemachange.sh --env=qa
+bash scripts/deploy_schemachange.sh --env=preprod
+bash scripts/deploy_schemachange.sh --env=prod
 
 # Dry-run (shows what would be deployed without executing)
-bash scripts/deploy.sh --env=prod --dry-run
+bash scripts/deploy_schemachange.sh --env=prod --dry-run
 ```
 
 ### Data Loading
@@ -148,12 +155,12 @@ bash scripts/streamlit_stop.sh
 
 ### CI Pipeline Steps
 
-1. **SQL Lint** — `sqlfluff lint` with Snowflake dialect
-2. **Script Validation** — Verifies SQL files exist and `environments.yml` structure
+1. **SQL Lint** — `sqlfluff lint banking/` with Snowflake dialect
+2. **Script Validation** — Verifies migration scripts exist with proper naming (V/R/A prefixes) and `environments.yml` structure
 
 ### Deployment Pipeline Steps
 
-1. **Deploy** — Runs `deploy.sh` for the target environment
+1. **Deploy** — Runs `deploy_schemachange.sh` for the target environment (applies only unapplied migrations)
 2. **Smoke Tests** — Validates all objects were created
 3. **Integration/Regression Tests** — Validates object counts, procedures, policies
 
@@ -166,23 +173,80 @@ gh workflow run deploy-prod.yml -f action=rollback -f rollback_version=<tag-or-s
 
 ---
 
-## SQL Scripts Deployment Order
+## Schemachange Migrations
 
-Scripts are deployed sequentially (01-11):
+All migrations live in `banking/` and are managed by [schemachange](https://github.com/Snowflake-Labs/schemachange). Schemachange recursively discovers scripts in subdirectories and executes them based on version order.
 
-| # | File | Objects Created |
-|---|------|----------------|
-| 01 | `01_setup_schemas.sql` | BRONZE, SILVER, GOLD, GOVERNANCE schemas |
-| 02 | `02_bronze_tables.sql` | T_Customer, T_Account, T_Transaction, stage, stream, tasks |
-| 03 | `03_silver_tables.sql` | DimCustomer, DimAccount, DimTransactionType, DimDate |
-| 04 | `04_gold_tables.sql` | FactDailyTransaction, FactDailyAgg, views |
-| 05 | `05_silver_procedures.sql` | SCD-2 (Customer), SCD-1 (Account), dimension loaders |
-| 06 | `06_gold_procedures.sql` | Fact table loaders, aggregation procedures |
-| 07 | `07_orchestration.sql` | Daily_ETL_Run() master orchestrator |
-| 08 | `08_seed_data.sql` | File formats, stages, streams, load tasks |
-| 09 | `09_masking_policies.sql` | MASK_NAME, MASK_EMAIL, MASK_PHONE, MASK_LOCATION, MASK_FINANCIAL_ID, MASK_AMOUNT |
-| 10 | `10_data_quality.sql` | DATA_QUALITY_LOG table, Cleanse_Bronze_Data(), Run_Data_Quality_Checks() |
-| 11 | `11_iceberg_objects.sql` | PARQUET_FORMAT, ICEBERG_STAGE |
+### Script Types
+
+| Prefix | Behavior | Example |
+|--------|----------|---------|
+| `V` | Versioned — runs exactly once, in version order | `V1.2.0__silver_tables.sql` |
+| `R` | Repeatable — re-runs whenever file content changes (checksum) | `R__gold_views.sql` |
+| `A` | Always — runs on every deployment | `A__grants.sql` |
+
+### Migration Inventory
+
+| Version | Location | Objects Created |
+|---------|----------|----------------|
+| V1.0.0 | `_platform/` | BRONZE, SILVER, GOLD, GOVERNANCE, METADATA schemas |
+| V1.1.0 | `bronze/retail/` | T_Customer, T_Account, T_Transaction |
+| V1.2.0 | `silver/retail/` | DimCustomer, DimAccount, DimTransactionType, DimDate |
+| V1.3.0 | `gold/retail/` | FactDailyTransaction, FactDailyAgg |
+| V1.4.0 | `silver/retail/` | SCD-2 (Customer), SCD-1 (Account), dimension loaders |
+| V1.5.0 | `gold/retail/` | Fact table loaders, aggregation procedures |
+| V1.6.0 | `orchestration/` | Daily_ETL_Run() master orchestrator |
+| V1.7.0 | `reference/` | CSV_FORMAT, DATA_STAGE, STREAM_DATA_FILES |
+| V1.7.1 | `orchestration/` | TASK_LOAD_CUSTOMER, TASK_LOAD_ACCOUNT, TASK_LOAD_TRANSACTION |
+| V1.8.0 | `governance/` | Masking policies (NAME, EMAIL, PHONE, LOCATION, FINANCIAL_ID, AMOUNT) |
+| V1.9.0 | `governance/` | DATA_QUALITY_LOG, Cleanse_Bronze_Data(), Run_Data_Quality_Checks() |
+| V1.10.0 | `reference/` | PARQUET_FORMAT, ICEBERG_STAGE |
+| R__ | `gold/retail/` | MonthlySpendProfile, TxnTypeTrend views |
+| A__ | `governance/` | Schema grants and future privileges |
+
+### Change History Table
+
+Schemachange tracks applied migrations in `<DATABASE>.METADATA.SCHEMACHANGE_HISTORY`. This table is auto-created on first deploy (`--create-change-history-table`).
+
+### Adding a New Migration
+
+1. Create a new file in the appropriate `banking/` subdirectory:
+   ```
+   banking/silver/retail/V1.11.0__add_customer_segment.sql
+   ```
+
+2. Use Jinja variables for environment portability:
+   ```sql
+   USE DATABASE {{ database }};
+   ALTER TABLE SILVER.DIMCUSTOMER ADD COLUMN SEGMENT VARCHAR(50);
+   ```
+
+3. Test locally with dry-run:
+   ```bash
+   bash scripts/deploy_schemachange.sh --env=dev --dry-run
+   ```
+
+4. Apply:
+   ```bash
+   bash scripts/deploy_schemachange.sh --env=dev
+   ```
+
+5. Commit and push — CI/CD handles QA/preprod/prod automatically.
+
+### Configuration
+
+- **Config file**: `schemachange-config.yml` (root-folder, default vars, change history table)
+- **Deploy script**: `scripts/deploy_schemachange.sh` (environment-aware wrapper)
+- **Dependencies**: `requirements.txt` (schemachange, pyyaml, jinja2)
+
+### Jinja Variables Available in Migrations
+
+| Variable | Description | Example Value |
+|----------|-------------|---------------|
+| `{{ database }}` | Target database name | `SSOM_COCO_DB` |
+| `{{ warehouse }}` | Compute warehouse | `COMPUTE_WH` |
+| `{{ role }}` | Deployment role | `SYSADMIN` |
+| `{{ environment }}` | Environment name | `dev` |
 
 ---
 
@@ -236,9 +300,9 @@ GOLD (Business Facts)
    CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_STAGING;
    ```
 
-3. Deploy:
+3. Deploy (schemachange will create the change history table and apply all migrations):
    ```bash
-   bash scripts/deploy.sh --env=staging
+   bash scripts/deploy_schemachange.sh --env=staging
    ```
 
 ---

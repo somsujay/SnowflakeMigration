@@ -24,9 +24,75 @@
 
 ---
 
-## 2. CI/CD Pipeline
+## 2. Project Structure
 
-### 2.1 Workflow Files
+The SQL codebase uses **schemachange** for migration management, organized under the `banking/` root folder:
+
+```
+banking/
+├── _platform/
+│   └── V1.0.0__setup_schemas.sql         # Schema creation (BRONZE, SILVER, GOLD, etc.)
+├── bronze/retail/
+│   └── V1.1.0__bronze_tables.sql         # Bronze tables, stages, streams, tasks
+├── silver/retail/
+│   ├── V1.2.0__silver_tables.sql         # Silver dimension tables
+│   └── V1.4.0__silver_procedures.sql     # Silver ETL procedures (SCD-2, SCD-1)
+├── gold/retail/
+│   ├── V1.3.0__gold_tables.sql           # Gold fact tables
+│   ├── V1.5.0__gold_procedures.sql       # Gold ETL procedures
+│   └── R__gold_views.sql                 # Repeatable: Gold views (re-run every deploy)
+├── orchestration/
+│   ├── V1.6.0__orchestration.sql         # Daily_ETL_Run() orchestrator
+│   └── V1.7.1__ingestion_tasks.sql       # Ingestion task definitions
+├── reference/
+│   ├── V1.7.0__seed_data.sql             # Seed/reference data
+│   └── V1.10.0__iceberg_objects.sql      # Iceberg/Parquet ingestion objects
+└── governance/
+    ├── V1.8.0__masking_policies.sql      # Governance masking policies
+    ├── V1.9.0__data_quality.sql          # Data quality framework
+    └── A__grants.sql                     # Always-run: grants (re-applied every deploy)
+```
+
+### 2.1 Schemachange Naming Conventions
+
+| Prefix | Meaning | Behavior |
+|--------|---------|----------|
+| `V<ver>__<name>.sql` | Versioned migration | Runs once, tracked in change history |
+| `R__<name>.sql` | Repeatable migration | Re-runs if file content changes |
+| `A__<name>.sql` | Always-run migration | Runs on every deployment |
+
+### 2.2 Schemachange Configuration
+
+File: `schemachange-config.yml`
+
+```yaml
+root-folder: banking
+modules-folder: null
+vars:
+  database: "SSOM_COCO_DB"
+  warehouse: "COMPUTE_WH"
+  role: "SYSADMIN"
+  environment: "dev"
+
+create-change-history-table: true
+change-history-table: "{{database}}.METADATA.SCHEMACHANGE_HISTORY"
+autocommit: true
+dry-run: false
+```
+
+### 2.3 Change History
+
+Schemachange tracks all applied migrations in `<database>.METADATA.SCHEMACHANGE_HISTORY`. Query it to see deployment state:
+
+```sql
+SELECT * FROM SSOM_COCO_DB.METADATA.SCHEMACHANGE_HISTORY ORDER BY INSTALLED_ON DESC;
+```
+
+---
+
+## 3. CI/CD Pipeline
+
+### 3.1 Workflow Files
 
 | File | Purpose | Trigger |
 |------|---------|---------|
@@ -35,16 +101,26 @@
 | `.github/workflows/deploy-preprod.yml` | Deploy + test PreProd | Push to `main` |
 | `.github/workflows/deploy-prod.yml` | Deploy + validate Prod | Tag `v*` or manual dispatch |
 
-### 2.2 Pipeline Stages
+### 3.2 Pipeline Stages
 
 ```
-┌──────────┐    ┌──────────────┐    ┌─────────────────┐    ┌──────────────┐
-│ SQL Lint │───►│ Deploy SQL   │───►│ Smoke Tests     │───►│ Integration  │
-│ (CI)     │    │ (11 scripts) │    │ (object exists) │    │ Tests        │
-└──────────┘    └──────────────┘    └─────────────────┘    └──────────────┘
+┌──────────────┐    ┌───────────────────┐    ┌─────────────────┐    ┌──────────────┐
+│ SQL Lint     │───►│ Deploy via        │───►│ Smoke Tests     │───►│ Integration  │
+│ (sqlfluff)   │    │ schemachange      │    │ (object exists) │    │ Tests        │
+└──────────────┘    └───────────────────┘    └─────────────────┘    └──────────────┘
 ```
 
-### 2.3 Concurrency Controls
+### 3.3 CI Lint Job Details
+
+The CI workflow:
+1. Lints `banking/` with sqlfluff
+2. Validates versioned migration files (`V*.sql`) exist and are non-empty
+3. Checks `environments.yml` has all required environments
+4. Runs shellcheck on deployment scripts
+
+Path triggers: `banking/**`, `scripts/**`, `tests/**`, `environments.yml`, `schemachange-config.yml`, `.sqlfluff`
+
+### 3.4 Concurrency Controls
 
 All deploy workflows use concurrency groups to prevent parallel deployments:
 
@@ -56,9 +132,9 @@ concurrency:
 
 ---
 
-## 3. Secrets Management
+## 4. Secrets Management
 
-### 3.1 Required GitHub Secrets
+### 4.1 Required GitHub Secrets
 
 #### Non-Production (QA, PreProd)
 
@@ -76,7 +152,7 @@ concurrency:
 | `SNOWFLAKE_PROD_USER` | `SOMSUJAY` | deploy-prod |
 | `SNOWFLAKE_PROD_PRIVATE_KEY` | RSA private key (PEM) | deploy-prod |
 
-### 3.2 Key Rotation Procedure
+### 4.2 Key Rotation Procedure
 
 1. Generate new key pair:
    ```bash
@@ -99,23 +175,51 @@ concurrency:
    ALTER USER SOMSUJAY UNSET RSA_PUBLIC_KEY_2;
    ```
 
-### 3.3 Key Rotation Schedule
+### 4.3 Key Rotation Schedule
 
 - Rotate every 90 days
 - Rotate immediately if any key exposure is suspected
 
 ---
 
-## 4. Deployment Procedures
+## 5. Deployment Procedures
 
-### 4.1 Standard Release (QA → PreProd → Prod)
+### 5.1 Primary Deployment: Schemachange
+
+The primary deployment method uses `scripts/deploy_schemachange.sh`, which invokes schemachange against the `banking/` root folder:
+
+```bash
+# Deploy to dev (local)
+export SNOWFLAKE_ACCOUNT=KXAXARZ-GW22129
+export SNOWFLAKE_USER=SOMSUJAY
+bash scripts/deploy_schemachange.sh --env=dev
+
+# Deploy to QA
+bash scripts/deploy_schemachange.sh --env=qa
+
+# Dry-run (no changes made)
+bash scripts/deploy_schemachange.sh --env=prod --dry-run
+```
+
+The script:
+1. Reads database/warehouse/connection from `environments.yml`
+2. Authenticates via RSA private key (`SNOWFLAKE_PRIVATE_KEY_PATH` or `~/.snowflake/ci_key.p8`)
+3. Runs `schemachange deploy` against the `banking/` folder
+4. Passes `database`, `warehouse`, `role`, and `environment` as template variables
+5. Tracks history in `<database>.METADATA.SCHEMACHANGE_HISTORY`
+
+### 5.2 Legacy Deployment: deploy.sh
+
+`scripts/deploy.sh` is the legacy deployer that executes numbered SQL scripts from a `Snowflake_Scripts/` directory. It is still referenced by the preprod workflow but will be migrated to schemachange.
+
+### 5.3 Standard Release (QA → PreProd → Prod)
 
 ```bash
 # 1. Create release branch from develop
 git checkout develop && git pull
 git checkout -b release/v1.3.0
 
-# 2. Push triggers deploy-qa.yml automatically
+# 2. Push triggers deploy-qa.yml automatically (schemachange)
 git push -u origin release/v1.3.0
 
 # 3. After QA passes, merge to main (triggers deploy-preprod.yml)
@@ -128,7 +232,7 @@ git tag v1.3.0
 git push origin v1.3.0
 ```
 
-### 4.2 Hotfix Release
+### 5.4 Hotfix Release
 
 ```bash
 # 1. Branch from main
@@ -151,25 +255,35 @@ git push origin v1.2.1
 git checkout develop && git merge main && git push
 ```
 
-### 4.3 Manual Deployment (Production)
+### 5.5 Manual Deployment (Production)
 
 Via GitHub Actions UI or CLI:
 ```bash
 gh workflow run deploy-prod.yml -f action=deploy
 ```
 
-### 4.4 Dry-Run Deployment
+### 5.6 Adding a New Migration
 
-Test what would be deployed without executing:
 ```bash
-bash scripts/deploy.sh --env=prod --dry-run
+# 1. Create a new versioned migration file
+#    Use the next version number and a descriptive name
+touch banking/<layer>/<domain>/V1.11.0__add_new_table.sql
+
+# 2. Write your SQL (use Jinja vars for database targeting)
+#    Available vars: {{database}}, {{warehouse}}, {{role}}, {{environment}}
+
+# 3. Test locally with dry-run
+bash scripts/deploy_schemachange.sh --env=dev --dry-run
+
+# 4. Deploy to dev
+bash scripts/deploy_schemachange.sh --env=dev
 ```
 
 ---
 
-## 5. Rollback Procedures
+## 6. Rollback Procedures
 
-### 5.1 Automated Rollback (Production)
+### 6.1 Automated Rollback (Production)
 
 ```bash
 # Via GitHub CLI
@@ -182,7 +296,7 @@ gh workflow run deploy-prod.yml \
 # Select action=rollback, enter version tag
 ```
 
-### 5.2 Manual Rollback (Any Environment)
+### 6.2 Manual Rollback (Any Environment)
 
 ```bash
 # Rollback PreProd to a specific version
@@ -192,14 +306,24 @@ bash scripts/rollback.sh --env=preprod --version=v1.2.0
 bash scripts/rollback.sh --env=prod --version=abc123f
 ```
 
-### 5.3 Rollback Process
+### 6.3 Rollback Process
 
+The `rollback.sh` script:
 1. Validates the target git ref exists
-2. Extracts `Snowflake_Scripts/` from that version
-3. Re-deploys all 11 SQL scripts from the old version
+2. Extracts `Snowflake_Scripts/` from that version (legacy format)
+3. Re-deploys all SQL scripts from the old version
 4. Runs smoke tests to confirm rollback success
 
-### 5.4 Rollback Decision Matrix
+**Note:** The rollback script currently operates on the legacy `Snowflake_Scripts/` directory. For schemachange-based rollbacks, create a new migration that reverses the changes.
+
+### 6.4 Schemachange Rollback Strategy
+
+Since schemachange tracks applied versions, rolling back requires one of:
+- **Fix-forward**: Create a new `V<next>__revert_<change>.sql` migration
+- **Manual revert**: Drop/alter objects directly, then update the change history table
+- **Full redeploy**: Drop the database, recreate, and run schemachange from scratch
+
+### 6.5 Rollback Decision Matrix
 
 | Severity | Detection | Action |
 |----------|-----------|--------|
@@ -210,9 +334,9 @@ bash scripts/rollback.sh --env=prod --version=abc123f
 
 ---
 
-## 6. Environment Management
+## 7. Environment Management
 
-### 6.1 Configuration File
+### 7.1 Configuration File
 
 `environments.yml` is the single source of truth:
 
@@ -238,17 +362,19 @@ prod:
   connection: MY_TRIAL_ACCOUNT
 ```
 
-### 6.2 Environment Variable Overrides
+### 7.2 Environment Variable Overrides
 
-Scripts accept runtime overrides (useful for testing against different targets):
+Scripts accept runtime overrides:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SNOWFLAKE_CONNECTION` | `MY_TRIAL_ACCOUNT` | Connection profile name |
-| `SNOWFLAKE_DATABASE` | `SSOM_COCO_DB` | Target database |
-| `SNOWFLAKE_WAREHOUSE` | `COMPUTE_WH` | Compute warehouse |
+| `SNOWFLAKE_ACCOUNT` | (required in CI) | Snowflake account identifier |
+| `SNOWFLAKE_USER` | (required in CI) | Snowflake user name |
+| `SNOWFLAKE_PRIVATE_KEY_PATH` | `~/.snowflake/ci_key.p8` | Path to RSA private key |
+| `SNOWFLAKE_ROLE` | `SYSADMIN` | Role for schemachange |
+| `SNOWFLAKE_WAREHOUSE` | From environments.yml | Compute warehouse override |
 
-### 6.3 Provisioning a New Environment
+### 7.3 Provisioning a New Environment
 
 ```sql
 -- 1. Create database
@@ -260,8 +386,8 @@ GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE ACCOUNTADMIN;
 ```
 
 ```bash
-# 3. Deploy
-bash scripts/deploy.sh --env=<env>
+# 3. Deploy with schemachange
+bash scripts/deploy_schemachange.sh --env=<env>
 
 # 4. Verify
 bash scripts/run_smoke_tests.sh --env=<env>
@@ -269,9 +395,9 @@ bash scripts/run_smoke_tests.sh --env=<env>
 
 ---
 
-## 7. Monitoring and Alerting
+## 8. Monitoring and Alerting
 
-### 7.1 Deployment Health Checks
+### 8.1 Deployment Health Checks
 
 After every deployment, the pipeline validates:
 
@@ -284,12 +410,12 @@ After every deployment, the pipeline validates:
 | Masking policies | `tests/integration_test.sql` | Governance policies deployed |
 | Data quality table | `tests/integration_test.sql` | DATA_QUALITY_LOG exists |
 
-### 7.2 GitHub Actions Notifications
+### 8.2 GitHub Actions Notifications
 
 - **Success**: `::notice` annotation on the workflow run
 - **Failure**: `::error` annotation with rollback instructions
 
-### 7.3 Manual Health Check
+### 8.3 Manual Health Check
 
 ```bash
 snow sql -c MY_TRIAL_ACCOUNT -q "
@@ -300,11 +426,22 @@ snow sql -c MY_TRIAL_ACCOUNT -q "
 "
 ```
 
+### 8.4 Checking Migration State
+
+```bash
+snow sql -c MY_TRIAL_ACCOUNT -q "
+  SELECT VERSION, SCRIPT, INSTALLED_ON, STATUS
+  FROM SSOM_COCO_DB.METADATA.SCHEMACHANGE_HISTORY
+  ORDER BY INSTALLED_ON DESC
+  LIMIT 20;
+"
+```
+
 ---
 
-## 8. Incident Response
+## 9. Incident Response
 
-### 8.1 Severity Levels
+### 9.1 Severity Levels
 
 | Level | Definition | Response Time | Examples |
 |-------|------------|---------------|----------|
@@ -313,12 +450,13 @@ snow sql -c MY_TRIAL_ACCOUNT -q "
 | SEV3 | Non-prod broken or degraded performance | 4 hours | QA deploy failure, slow queries |
 | SEV4 | Cosmetic or documentation issue | Next sprint | Lint warnings, README outdated |
 
-### 8.2 SEV1/SEV2 Response Playbook
+### 9.2 SEV1/SEV2 Response Playbook
 
 ```
 1. ASSESS
    - Check GitHub Actions run logs
    - Check Snowflake query history: SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY
+   - Check migration state: SELECT * FROM <DB>.METADATA.SCHEMACHANGE_HISTORY ORDER BY INSTALLED_ON DESC;
 
 2. CONTAIN
    - Suspend tasks if ETL is producing bad data:
@@ -337,44 +475,45 @@ snow sql -c MY_TRIAL_ACCOUNT -q "
    - Create follow-up ticket for root cause analysis
 ```
 
-### 8.3 Common Failure Scenarios
+### 9.3 Common Failure Scenarios
 
 | Scenario | Symptoms | Resolution |
 |----------|----------|------------|
 | Warehouse suspended | `Warehouse COMPUTE_WH cannot be resumed` | `ALTER WAREHOUSE COMPUTE_WH RESUME;` |
-| Key expired | `JWT token is invalid` | Rotate key (Section 3.2) |
+| Key expired | `JWT token is invalid` | Rotate key (Section 4.2) |
 | Account locked | `Authentication failed` | Unlock via Snowflake UI, check login attempts |
 | Quota exceeded | `Exceeded resource limit` | Check `SNOWFLAKE.ACCOUNT_USAGE.WAREHOUSE_METERING_HISTORY` |
 | Task stuck | Task shows EXECUTING indefinitely | `ALTER TASK ... SUSPEND;` then `RESUME;` |
+| Migration already applied | `Version already exists in change history` | Check if script was already run; bump version if content changed |
 
 ---
 
-## 9. Maintenance Tasks
+## 10. Maintenance Tasks
 
-### 9.1 Regular Maintenance Schedule
+### 10.1 Regular Maintenance Schedule
 
 | Task | Frequency | Procedure |
 |------|-----------|-----------|
-| Key rotation | Every 90 days | Section 3.2 |
+| Key rotation | Every 90 days | Section 4.2 |
 | Review query history | Weekly | Check long-running queries |
 | Warehouse sizing | Monthly | Analyze `WAREHOUSE_LOAD_HISTORY` |
 | Stale data check | Daily (automated) | `Run_Data_Quality_Checks()` |
 | GitHub Actions cleanup | Monthly | Delete old workflow runs |
 
-### 9.2 Cleaning Up Failed Deployments
+### 10.2 Cleaning Up Failed Deployments
 
 If a deployment partially completed:
 
 ```bash
-# Option A: Re-run the full deployment (idempotent - uses CREATE OR REPLACE)
-bash scripts/deploy.sh --env=<env>
+# Option A: Re-run schemachange (idempotent for already-applied versions)
+bash scripts/deploy_schemachange.sh --env=<env>
 
-# Option B: Nuclear option - drop everything and redeploy
+# Option B: Nuclear option - drop everything and redeploy from scratch
 bash scripts/drop_objects.sh --confirm
-bash scripts/create_objects.sh
+bash scripts/deploy_schemachange.sh --env=<env>
 ```
 
-### 9.3 Database Cloning (For Testing)
+### 10.3 Database Cloning (For Testing)
 
 ```sql
 -- Clone prod to a test database
@@ -383,17 +522,17 @@ CREATE DATABASE SSOM_COCO_DB_TEST CLONE SSOM_COCO_DB_PROD;
 
 ---
 
-## 10. Access Control
+## 11. Access Control
 
-### 10.1 Current Setup
+### 11.1 Current Setup
 
 | Role | Access | Usage |
 |------|--------|-------|
 | `ACCOUNTADMIN` | Full access | Deployments, DDL, grants |
-| `SYSADMIN` | Database management | Object creation |
+| `SYSADMIN` | Database management | Object creation (schemachange default) |
 | `PUBLIC` | Read-only on views | Dashboards, reporting |
 
-### 10.2 Principle of Least Privilege (Recommended)
+### 11.2 Principle of Least Privilege (Recommended)
 
 For production hardening, create dedicated roles:
 
@@ -414,356 +553,11 @@ GRANT SELECT ON ALL VIEWS IN SCHEMA SSOM_COCO_DB_PROD.GOLD TO ROLE READER_ROLE;
 
 ---
 
-## 11. Linting and Code Quality
+## 12. Linting and Code Quality
 
-### 11.1 SQLFluff Configuration
+### 12.1 SQLFluff Configuration
 
 File: `.sqlfluff`
-
-```ini
-[sqlfluff]
-dialect = snowflake
-templater = raw
-max_line_length = 120
-exclude_rules = LT05, RF04, LT02
-```
-
-Excluded rules:
-- `LT05` — long lines (allowed up to 120)
-- `RF04` — keywords as identifiers (e.g., `STATUS`, `DATE` columns are valid)
-- `LT02` — indentation (DDL alignment is intentional)
-
-### 11.2 Running Lint Locally
-
-```bash
-# Check for issues
-sqlfluff lint Snowflake_Scripts/ --dialect snowflake --config .sqlfluff
-
-# Auto-fix issues
-sqlfluff fix Snowflake_Scripts/ --dialect snowflake --config .sqlfluff --force
-```
-
-### 11.3 Pre-Commit Hook (Optional)
-
-```bash
-# .git/hooks/pre-commit
-#!/bin/bash
-sqlfluff lint Snowflake_Scripts/ --dialect snowflake --config .sqlfluff
-```
-
----
-
-## 12. Disaster Recovery
-
-### 12.1 Snowflake Time Travel
-
-All tables have default 1-day retention. To recover dropped/modified data:
-
-```sql
--- Query data as of 1 hour ago
-SELECT * FROM BRONZE.T_CUSTOMER AT(OFFSET => -3600);
-
--- Restore a dropped table
-UNDROP TABLE SILVER.DIMCUSTOMER;
-
--- Clone table from a point in time
-CREATE TABLE SILVER.DIMCUSTOMER_BACKUP CLONE SILVER.DIMCUSTOMER
-  AT(TIMESTAMP => '2026-07-15 10:00:00'::TIMESTAMP);
-```
-
-### 12.2 Full Environment Recovery
-
-```bash
-# 1. Recreate database
-snow sql -c MY_TRIAL_ACCOUNT -q "CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_PROD;"
-
-# 2. Redeploy from latest tag
-git checkout $(git describe --tags --abbrev=0)
-bash scripts/deploy.sh --env=prod
-
-# 3. Reload data (if needed)
-bash scripts/run_historical.sh
-bash scripts/run_incremental.sh
-```
-
----
-
-## 13. Contacts and Escalation
-
-| Role | Responsibility |
-|------|----------------|
-| DevOps Engineer | Pipeline failures, secret rotation, infra |
-| Data Engineer | ETL logic, procedure bugs, data quality |
-| DBA | Warehouse sizing, access control, performance |
-| Product Owner | Release approval, rollback decisions |
-
----
-
-## 14. Detailed Configuration Steps
-
-This section provides step-by-step instructions for configuring the entire DevOps pipeline from scratch.
-
----
-
-### 14.1 Snowflake Account Setup
-
-#### Step 1: Verify Account Access
-
-```bash
-# Confirm you can reach the account
-snow sql -c MY_TRIAL_ACCOUNT -q "SELECT CURRENT_ACCOUNT_NAME(), CURRENT_USER(), CURRENT_ROLE()"
-```
-
-Expected output:
-```
-| CURRENT_ACCOUNT_NAME() | CURRENT_USER() | CURRENT_ROLE() |
-|------------------------|----------------|----------------|
-| GW22129                | SOMSUJAY       | ACCOUNTADMIN   |
-```
-
-#### Step 2: Create Warehouse (if not exists)
-
-```sql
-CREATE WAREHOUSE IF NOT EXISTS COMPUTE_WH
-  WAREHOUSE_SIZE = 'X-SMALL'
-  AUTO_SUSPEND = 60
-  AUTO_RESUME = TRUE
-  INITIALLY_SUSPENDED = TRUE
-  COMMENT = 'Shared compute for ETL pipeline';
-```
-
-#### Step 3: Create Databases for Each Environment
-
-```sql
-CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB;          -- dev
-CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_QA;       -- qa
-CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_PREPROD;  -- preprod
-CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_PROD;     -- prod
-```
-
-#### Step 4: Grant Permissions
-
-```sql
--- Grant warehouse usage
-GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE ACCOUNTADMIN;
-GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE SYSADMIN;
-
--- Grant database ownership (repeat for each DB)
-GRANT ALL ON DATABASE SSOM_COCO_DB TO ROLE ACCOUNTADMIN;
-GRANT ALL ON DATABASE SSOM_COCO_DB_QA TO ROLE ACCOUNTADMIN;
-GRANT ALL ON DATABASE SSOM_COCO_DB_PREPROD TO ROLE ACCOUNTADMIN;
-GRANT ALL ON DATABASE SSOM_COCO_DB_PROD TO ROLE ACCOUNTADMIN;
-```
-
----
-
-### 14.2 Local Development Environment Setup
-
-#### Step 1: Install Prerequisites
-
-```bash
-# Snowflake CLI
-pip install snowflake-cli-labs
-
-# SQL linting
-pip install sqlfluff
-
-# Verify installations
-snow --version
-sqlfluff version
-```
-
-#### Step 2: Generate RSA Key Pair
-
-```bash
-# Generate private key (PKCS#8 format, unencrypted)
-openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out ~/.snowflake/trial_key.p8 -nocrypt
-
-# Set strict permissions
-chmod 600 ~/.snowflake/trial_key.p8
-
-# Generate public key
-openssl rsa -in ~/.snowflake/trial_key.p8 -pubout -out ~/.snowflake/trial_key.pub
-```
-
-#### Step 3: Register Public Key in Snowflake
-
-Extract the key body (without BEGIN/END headers):
-```bash
-grep -v "^---" ~/.snowflake/trial_key.pub | tr -d '\n'
-```
-
-Run in Snowflake:
-```sql
-ALTER USER SOMSUJAY SET RSA_PUBLIC_KEY='<paste-key-body-here>';
-```
-
-Verify:
-```sql
-DESC USER SOMSUJAY;
--- Look for RSA_PUBLIC_KEY_FP (fingerprint should be populated)
-```
-
-#### Step 4: Configure connections.toml
-
-Create/edit `~/.snowflake/connections.toml`:
-
-```toml
-[MY_TRIAL_ACCOUNT]
-account = "KXAXARZ-GW22129"
-user = "SOMSUJAY"
-authenticator = "SNOWFLAKE_JWT"
-private_key_path = "/Users/<your-username>/.snowflake/trial_key.p8"
-warehouse = "COMPUTE_WH"
-database = "SSOM_COCO_DB"
-```
-
-Set file permissions:
-```bash
-chmod 600 ~/.snowflake/connections.toml
-```
-
-#### Step 5: Verify Connection
-
-```bash
-snow sql -c MY_TRIAL_ACCOUNT -q "SELECT 'Connection OK' AS status, CURRENT_WAREHOUSE() AS wh"
-```
-
-Expected:
-```
-| STATUS        | WH         |
-|---------------|------------|
-| Connection OK | COMPUTE_WH |
-```
-
----
-
-### 14.3 GitHub Repository Configuration
-
-#### Step 1: Create GitHub Environments
-
-Navigate to **Settings > Environments** and create:
-
-| Environment | Protection Rules |
-|-------------|-----------------|
-| `qa` | None (auto-deploy) |
-| `preprod` | None (auto-deploy) |
-| `production` | Required reviewers, wait timer (optional) |
-
-#### Step 2: Configure Repository Secrets
-
-Navigate to **Settings > Secrets and variables > Actions > New repository secret**:
-
-```
-SNOWFLAKE_ACCOUNT        = KXAXARZ-GW22129
-SNOWFLAKE_USER           = SOMSUJAY
-SNOWFLAKE_PRIVATE_KEY    = <contents of ~/.snowflake/trial_key.p8>
-
-SNOWFLAKE_PROD_ACCOUNT   = KXAXARZ-GW22129
-SNOWFLAKE_PROD_USER      = SOMSUJAY
-SNOWFLAKE_PROD_PRIVATE_KEY = <contents of ~/.snowflake/trial_key.p8>
-```
-
-To copy the private key:
-```bash
-cat ~/.snowflake/trial_key.p8 | pbcopy   # macOS
-cat ~/.snowflake/trial_key.p8 | xclip    # Linux
-```
-
-#### Step 3: Verify Secrets Are Set
-
-```bash
-gh secret list
-```
-
-Expected output:
-```
-SNOWFLAKE_ACCOUNT           Updated 2026-07-17
-SNOWFLAKE_USER              Updated 2026-07-17
-SNOWFLAKE_PRIVATE_KEY       Updated 2026-07-17
-SNOWFLAKE_PROD_ACCOUNT      Updated 2026-07-17
-SNOWFLAKE_PROD_USER         Updated 2026-07-17
-SNOWFLAKE_PROD_PRIVATE_KEY  Updated 2026-07-17
-```
-
-#### Step 4: Configure Branch Protection Rules
-
-Navigate to **Settings > Branches > Add rule**:
-
-| Branch Pattern | Rules |
-|----------------|-------|
-| `main` | Require PR, require status checks (CI Lint), no force push |
-| `develop` | Require PR, require status checks (CI Lint) |
-| `release/*` | Require PR from develop only |
-
----
-
-### 14.4 environments.yml Configuration
-
-This file drives all deployment scripts. Located at project root.
-
-```yaml
-# environments.yml
-# Promotion path: dev → qa → preprod → prod
-
-dev:
-  database: SSOM_COCO_DB        # Development database
-  warehouse: COMPUTE_WH          # Warehouse (overridable via SNOWFLAKE_WAREHOUSE)
-  connection: MY_TRIAL_ACCOUNT   # Connection profile in connections.toml
-
-qa:
-  database: SSOM_COCO_DB_QA
-  warehouse: COMPUTE_WH
-  connection: MY_TRIAL_ACCOUNT
-
-preprod:
-  database: SSOM_COCO_DB_PREPROD
-  warehouse: COMPUTE_WH
-  connection: MY_TRIAL_ACCOUNT
-
-prod:
-  database: SSOM_COCO_DB_PROD
-  warehouse: COMPUTE_WH
-  connection: MY_TRIAL_ACCOUNT
-```
-
-**Key rules:**
-- `connection` must match a section name in `~/.snowflake/connections.toml` (local) or the connection name written by CI scripts
-- `warehouse` must exist in the target Snowflake account
-- `database` is created during initial deployment if it doesn't exist (by `01_setup_schemas.sql` using `USE DATABASE`)
-
----
-
-### 14.5 CI/CD Connection Configuration (How It Works)
-
-In GitHub Actions, there is no `~/.snowflake/connections.toml`. The deploy scripts auto-create one from secrets:
-
-```
-SNOWFLAKE_ACCOUNT + SNOWFLAKE_USER + SNOWFLAKE_PRIVATE_KEY
-                          │
-                          ▼
-         scripts/deploy.sh (python3 block)
-                          │
-                          ▼
-         ~/.snowflake/connections.toml (created at runtime)
-         [MY_TRIAL_ACCOUNT]
-         account = "<from SNOWFLAKE_ACCOUNT>"
-         user = "<from SNOWFLAKE_USER>"
-         authenticator = "SNOWFLAKE_JWT"
-         private_key_path = "~/.snowflake/ci_key.p8"
-         warehouse = "<from SNOWFLAKE_WAREHOUSE or default COMPUTE_WH>"
-                          │
-                          ▼
-         snow sql -c MY_TRIAL_ACCOUNT --database <DB> -f <script.sql>
-```
-
-The same pattern is used by `rollback.sh` and `run_smoke_tests.sh`.
-
----
-
-### 14.6 SQLFluff Lint Configuration
-
-File: `.sqlfluff` (project root)
 
 ```ini
 [sqlfluff]
@@ -789,7 +583,7 @@ extended_capitalisation_policy = upper
 ignore = Teradata_Scripts
 ```
 
-**Rule exclusions explained:**
+### 12.2 Rule Exclusions
 
 | Rule | Reason for Exclusion |
 |------|---------------------|
@@ -797,16 +591,238 @@ ignore = Teradata_Scripts
 | `RF04` | Column names like STATUS, DATE, TYPE are valid Snowflake identifiers |
 | `LT02` | DDL property indentation is intentional for readability |
 
-**Conventions enforced:**
-- Keywords: UPPER CASE (`SELECT`, `CREATE`, `FROM`)
-- Functions: UPPER CASE (`COUNT`, `IFF`, `CURRENT_TIMESTAMP`)
-- Types: UPPER CASE (`VARCHAR`, `INTEGER`, `TIMESTAMP`)
-- Indentation: 4 spaces
-- Max line length: 120 characters
+### 12.3 Running Lint Locally
+
+```bash
+# Check for issues
+sqlfluff lint banking/ --dialect snowflake --config .sqlfluff
+
+# Auto-fix issues
+sqlfluff fix banking/ --dialect snowflake --config .sqlfluff --force
+```
+
+### 12.4 Pre-Commit Hook (Optional)
+
+```bash
+# .git/hooks/pre-commit
+#!/bin/bash
+sqlfluff lint banking/ --dialect snowflake --config .sqlfluff
+```
 
 ---
 
-### 14.7 Streamlit Dashboard Configuration
+## 13. Disaster Recovery
+
+### 13.1 Snowflake Time Travel
+
+All tables have default 1-day retention. To recover dropped/modified data:
+
+```sql
+-- Query data as of 1 hour ago
+SELECT * FROM BRONZE.T_CUSTOMER AT(OFFSET => -3600);
+
+-- Restore a dropped table
+UNDROP TABLE SILVER.DIMCUSTOMER;
+
+-- Clone table from a point in time
+CREATE TABLE SILVER.DIMCUSTOMER_BACKUP CLONE SILVER.DIMCUSTOMER
+  AT(TIMESTAMP => '2026-07-15 10:00:00'::TIMESTAMP);
+```
+
+### 13.2 Full Environment Recovery
+
+```bash
+# 1. Recreate database
+snow sql -c MY_TRIAL_ACCOUNT -q "CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_PROD;"
+
+# 2. Redeploy all migrations from scratch
+git checkout $(git describe --tags --abbrev=0)
+bash scripts/deploy_schemachange.sh --env=prod
+
+# 3. Reload data (if needed)
+bash scripts/run_historical.sh
+bash scripts/run_incremental.sh
+```
+
+---
+
+## 14. Contacts and Escalation
+
+| Role | Responsibility |
+|------|----------------|
+| DevOps Engineer | Pipeline failures, secret rotation, infra |
+| Data Engineer | ETL logic, procedure bugs, data quality |
+| DBA | Warehouse sizing, access control, performance |
+| Product Owner | Release approval, rollback decisions |
+
+---
+
+## 15. Detailed Configuration Steps
+
+### 15.1 Snowflake Account Setup
+
+#### Step 1: Verify Account Access
+
+```bash
+snow sql -c MY_TRIAL_ACCOUNT -q "SELECT CURRENT_ACCOUNT_NAME(), CURRENT_USER(), CURRENT_ROLE()"
+```
+
+#### Step 2: Create Warehouse (if not exists)
+
+```sql
+CREATE WAREHOUSE IF NOT EXISTS COMPUTE_WH
+  WAREHOUSE_SIZE = 'X-SMALL'
+  AUTO_SUSPEND = 60
+  AUTO_RESUME = TRUE
+  INITIALLY_SUSPENDED = TRUE
+  COMMENT = 'Shared compute for ETL pipeline';
+```
+
+#### Step 3: Create Databases for Each Environment
+
+```sql
+CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB;          -- dev
+CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_QA;       -- qa
+CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_PREPROD;  -- preprod
+CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_PROD;     -- prod
+```
+
+#### Step 4: Grant Permissions
+
+```sql
+GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE ACCOUNTADMIN;
+GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE SYSADMIN;
+GRANT ALL ON DATABASE SSOM_COCO_DB TO ROLE ACCOUNTADMIN;
+GRANT ALL ON DATABASE SSOM_COCO_DB_QA TO ROLE ACCOUNTADMIN;
+GRANT ALL ON DATABASE SSOM_COCO_DB_PREPROD TO ROLE ACCOUNTADMIN;
+GRANT ALL ON DATABASE SSOM_COCO_DB_PROD TO ROLE ACCOUNTADMIN;
+```
+
+---
+
+### 15.2 Local Development Environment Setup
+
+#### Step 1: Install Prerequisites
+
+```bash
+# Snowflake CLI
+pip install snowflake-cli-labs
+
+# SQL linting
+pip install sqlfluff
+
+# Schemachange
+pip install schemachange
+
+# Verify installations
+snow --version
+sqlfluff version
+schemachange --version
+```
+
+#### Step 2: Generate RSA Key Pair
+
+```bash
+openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out ~/.snowflake/trial_key.p8 -nocrypt
+chmod 600 ~/.snowflake/trial_key.p8
+openssl rsa -in ~/.snowflake/trial_key.p8 -pubout -out ~/.snowflake/trial_key.pub
+```
+
+#### Step 3: Register Public Key in Snowflake
+
+```bash
+grep -v "^---" ~/.snowflake/trial_key.pub | tr -d '\n'
+```
+
+```sql
+ALTER USER SOMSUJAY SET RSA_PUBLIC_KEY='<paste-key-body-here>';
+```
+
+#### Step 4: Configure connections.toml
+
+Create/edit `~/.snowflake/connections.toml`:
+
+```toml
+[MY_TRIAL_ACCOUNT]
+account = "KXAXARZ-GW22129"
+user = "SOMSUJAY"
+authenticator = "SNOWFLAKE_JWT"
+private_key_path = "/Users/<your-username>/.snowflake/trial_key.p8"
+warehouse = "COMPUTE_WH"
+database = "SSOM_COCO_DB"
+```
+
+```bash
+chmod 600 ~/.snowflake/connections.toml
+```
+
+#### Step 5: Verify Connection
+
+```bash
+snow sql -c MY_TRIAL_ACCOUNT -q "SELECT 'Connection OK' AS status, CURRENT_WAREHOUSE() AS wh"
+```
+
+---
+
+### 15.3 GitHub Repository Configuration
+
+#### Step 1: Create GitHub Environments
+
+Navigate to **Settings > Environments** and create:
+
+| Environment | Protection Rules |
+|-------------|-----------------|
+| `qa` | None (auto-deploy) |
+| `preprod` | None (auto-deploy) |
+| `production` | Required reviewers, wait timer (optional) |
+
+#### Step 2: Configure Repository Secrets
+
+```
+SNOWFLAKE_ACCOUNT        = KXAXARZ-GW22129
+SNOWFLAKE_USER           = SOMSUJAY
+SNOWFLAKE_PRIVATE_KEY    = <contents of ~/.snowflake/trial_key.p8>
+
+SNOWFLAKE_PROD_ACCOUNT   = KXAXARZ-GW22129
+SNOWFLAKE_PROD_USER      = SOMSUJAY
+SNOWFLAKE_PROD_PRIVATE_KEY = <contents of ~/.snowflake/trial_key.p8>
+```
+
+#### Step 3: Configure Branch Protection Rules
+
+| Branch Pattern | Rules |
+|----------------|-------|
+| `main` | Require PR, require status checks (CI Lint), no force push |
+| `develop` | Require PR, require status checks (CI Lint) |
+| `release/*` | Require PR from develop only |
+
+---
+
+### 15.4 CI/CD Connection Configuration (How It Works)
+
+In GitHub Actions, there is no `~/.snowflake/connections.toml`. The deploy workflows create credentials at runtime:
+
+```
+SNOWFLAKE_ACCOUNT + SNOWFLAKE_USER + SNOWFLAKE_PRIVATE_KEY
+                          │
+                          ▼
+         Write private key to ~/.snowflake/ci_key.p8
+                          │
+                          ▼
+         scripts/deploy_schemachange.sh
+                          │
+                          ▼
+         schemachange deploy --root-folder banking/
+           --snowflake-account <ACCOUNT>
+           --snowflake-user <USER>
+           --snowflake-private-key-path ~/.snowflake/ci_key.p8
+           --snowflake-database <DB from environments.yml>
+           --change-history-table <DB>.METADATA.SCHEMACHANGE_HISTORY
+```
+
+---
+
+### 15.5 Streamlit Dashboard Configuration
 
 #### Step 1: Create Streamlit secrets file
 
@@ -838,9 +854,7 @@ bash scripts/streamlit_stop.sh
 
 ---
 
-### 14.8 End-to-End Verification Checklist
-
-After completing all configuration steps, run this checklist:
+### 15.6 End-to-End Verification Checklist
 
 ```bash
 # 1. Verify Snowflake connection
@@ -849,8 +863,8 @@ snow sql -c MY_TRIAL_ACCOUNT -q "SELECT 1 AS connected"
 # 2. Verify warehouse exists
 snow sql -c MY_TRIAL_ACCOUNT -q "SHOW WAREHOUSES LIKE 'COMPUTE_WH'"
 
-# 3. Deploy to dev
-bash scripts/deploy.sh --env=dev
+# 3. Deploy to dev with schemachange
+bash scripts/deploy_schemachange.sh --env=dev
 
 # 4. Run smoke tests
 bash scripts/run_smoke_tests.sh --env=dev
@@ -871,7 +885,7 @@ snow sql -c MY_TRIAL_ACCOUNT -q "
 "
 
 # 8. Run lint
-sqlfluff lint Snowflake_Scripts/ --dialect snowflake --config .sqlfluff
+sqlfluff lint banking/ --dialect snowflake --config .sqlfluff
 
 # 9. Verify GitHub secrets (requires gh CLI authenticated)
 gh secret list
@@ -881,14 +895,11 @@ git checkout -b test/verify-pipeline
 git commit --allow-empty -m "test: verify CI pipeline"
 git push -u origin test/verify-pipeline
 gh pr create --base develop --title "Test: verify CI pipeline" --body "Testing CI"
-# Check that CI Lint passes, then close the PR
 ```
-
-If all 10 steps pass, the environment is fully configured and operational.
 
 ---
 
-### 14.9 Configuration Reference Summary
+### 15.7 Configuration Reference Summary
 
 | Component | File/Location | Purpose |
 |-----------|---------------|---------|
@@ -896,11 +907,33 @@ If all 10 steps pass, the environment is fully configured and operational.
 | RSA private key | `~/.snowflake/trial_key.p8` | Key-pair auth credential |
 | RSA public key | Registered on Snowflake user | Validates JWT tokens |
 | Environment config | `environments.yml` | Database/warehouse/connection per env |
+| Schemachange config | `schemachange-config.yml` | Migration tool settings |
 | GitHub secrets | Repository Settings | CI/CD authentication |
 | Lint config | `.sqlfluff` | SQL formatting rules |
+| Migration scripts | `banking/` | Versioned SQL migrations |
 | Streamlit secrets | `streamlit_app/.streamlit/secrets.toml` | Dashboard auth |
 | CI workflows | `.github/workflows/*.yml` | Pipeline definitions |
-| Deploy script | `scripts/deploy.sh` | Orchestrates SQL deployment |
+| Deploy script | `scripts/deploy_schemachange.sh` | Schemachange deployment orchestrator |
+| Legacy deploy | `scripts/deploy.sh` | Legacy numbered-script deployer |
 | Rollback script | `scripts/rollback.sh` | Reverts to prior version |
 | Smoke tests | `tests/smoke_test.sql` | Post-deploy object checks |
 | Integration tests | `tests/integration_test.sql` | Deep validation checks |
+
+---
+
+## 16. Scripts Reference
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `scripts/deploy_schemachange.sh` | Primary deployment via schemachange | `--env=<env> [--dry-run]` |
+| `scripts/deploy.sh` | Legacy deployment (numbered scripts) | `--env=<env> [--dry-run]` |
+| `scripts/rollback.sh` | Rollback to a git version | `--env=<env> --version=<tag>` |
+| `scripts/run_smoke_tests.sh` | Post-deploy smoke tests | `--env=<env>` |
+| `scripts/run_historical.sh` | Load historical data | — |
+| `scripts/run_incremental.sh` | Load incremental data | — |
+| `scripts/run_etl_end_to_end.sh` | Full ETL pipeline run | — |
+| `scripts/create_objects.sh` | Create all Snowflake objects | — |
+| `scripts/drop_objects.sh` | Drop all Snowflake objects | `--confirm` |
+| `scripts/bootstrap_change_history.sql` | Initialize schemachange history table | — |
+| `scripts/streamlit_start.sh` | Start Streamlit dashboard | — |
+| `scripts/streamlit_stop.sh` | Stop Streamlit dashboard | — |
