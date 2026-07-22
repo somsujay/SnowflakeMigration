@@ -1,19 +1,11 @@
 /* ============================================================
-   FILE    : 02_bronze_tables.sql
-   PURPOSE : Bronze layer DDL – raw staging tables
-   SCHEMA  : BRONZE
-   NOTES   :
-       - Direct landing zone for OLTP source data
-       - _LOADED_AT metadata column tracks ingestion time
-       - No PRIMARY INDEX (Snowflake uses micro-partitions)
+   schemachange Migration: V1.1.0__bronze_tables.sql
+   PURPOSE : Bronze layer DDL - raw staging tables
    ============================================================ */
 
+USE DATABASE {{ database }};
+USE SCHEMA BRONZE;
 
--- ----------------------------------------------------------
--- T_Customer
--- Raw customer master data sourced from the OLTP system.
--- Staged here prior to SCD-2 processing into SILVER.DimCustomer.
--- ----------------------------------------------------------
 CREATE OR REPLACE TABLE BRONZE.T_CUSTOMER
 (
     CUSTOMER_ID VARCHAR(50) NOT NULL,
@@ -28,12 +20,6 @@ CREATE OR REPLACE TABLE BRONZE.T_CUSTOMER
     _LOADED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
-
--- ----------------------------------------------------------
--- T_Account
--- Raw account data sourced from the OLTP system.
--- Staged here prior to SCD-1 upsert into SILVER.DimAccount.
--- ----------------------------------------------------------
 CREATE OR REPLACE TABLE BRONZE.T_ACCOUNT
 (
     ACCOUNT_ID VARCHAR(50) NOT NULL,
@@ -46,12 +32,6 @@ CREATE OR REPLACE TABLE BRONZE.T_ACCOUNT
     _LOADED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
-
--- ----------------------------------------------------------
--- T_Transaction
--- Raw transaction records sourced from the OLTP system.
--- Staged here prior to loading into GOLD fact tables.
--- ----------------------------------------------------------
 CREATE OR REPLACE TABLE BRONZE.T_TRANSACTION
 (
     TRANSACTION_ID VARCHAR(50) NOT NULL,

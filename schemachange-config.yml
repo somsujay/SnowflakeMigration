@@ -1,0 +1,12 @@
+root-folder: banking
+modules-folder: null
+vars:
+  database: "SSOM_COCO_DB"
+  warehouse: "COMPUTE_WH"
+  role: "SYSADMIN"
+  environment: "dev"
+
+create-change-history-table: true
+change-history-table: "{{database}}.METADATA.SCHEMACHANGE_HISTORY"
+autocommit: true
+dry-run: false
