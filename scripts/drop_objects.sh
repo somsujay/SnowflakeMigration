@@ -125,7 +125,7 @@ echo ">> Views dropped."
 # ============================================================
 header "Dropping Procedures"
 
-run_sql "DROP PROCEDURE IF EXISTS PUBLIC.Daily_ETL_Run();"
+run_sql "DROP PROCEDURE IF EXISTS GOLD.Daily_ETL_Run();"
 run_sql "DROP PROCEDURE IF EXISTS SILVER.Close_Current_DimCustomer_Record();"
 run_sql "DROP PROCEDURE IF EXISTS SILVER.Insert_New_DimCustomer_Record();"
 run_sql "DROP PROCEDURE IF EXISTS SILVER.Load_DimAccount_SCD1();"
