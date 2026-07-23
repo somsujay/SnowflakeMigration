@@ -1,6 +1,6 @@
 # Teradata to Snowflake Migration
 
-Converts a Teradata DWH ETL pipeline into Snowflake using a **Medallion Architecture** (Bronze / Silver / Gold) with two ingestion options: CSV files or Iceberg/Parquet files.
+Converts a Teradata DWH ETL pipeline into Snowflake using a **Medallion Architecture** (Bronze / Silver / Gold) with two ingestion options: CSV files or Iceberg/Parquet files. Deployments are managed via **schemachange** with CI/CD through GitHub Actions.
 
 ## Architecture
 
@@ -49,27 +49,34 @@ Converts a Teradata DWH ETL pipeline into Snowflake using a **Medallion Architec
 ## Prerequisites
 
 - [Snowflake CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli) (`snow`) installed and configured
-- Connection `HAKKODAINC_PARTNER` configured in `~/.snowflake/connections.toml`
-- Python 3.9+ (for Iceberg table creation and Streamlit dashboard)
+- Connection `MY_TRIAL_ACCOUNT` configured in `~/.snowflake/connections.toml`
+- Python 3.11+ (for schemachange, Iceberg table creation, and Streamlit dashboard)
+- [schemachange](https://github.com/Snowflake-Labs/schemachange) (`pip install schemachange`)
+- [sqlfluff](https://sqlfluff.com/) (`pip install sqlfluff`) for SQL linting
 
 ## Quick Start
 
-### 0. Drop Existing Objects (if re-deploying)
+### 1. Deploy Snowflake Objects (via Schemachange)
 
 ```bash
-bash scripts/drop_objects.sh           # dry-run (shows what will be dropped)
-bash scripts/drop_objects.sh --confirm # actually drops everything
+# Set required environment variables
+export SNOWFLAKE_ACCOUNT=KXAXARZ-GW22129
+export SNOWFLAKE_USER=SOMSUJAY
+
+# Deploy to dev
+bash scripts/deploy_schemachange.sh --env=dev
+
+# Dry-run (see what would be deployed without executing)
+bash scripts/deploy_schemachange.sh --env=dev --dry-run
 ```
 
-### 1. Deploy Snowflake Objects
+### 2. Run Smoke Tests
 
 ```bash
-bash scripts/create_objects.sh
+bash scripts/run_smoke_tests.sh --env=dev
 ```
 
-Deploys all schemas, tables, stages, tasks, procedures, masking policies, and data quality framework.
-
-### 2. Run the ETL Pipeline
+### 3. Run the ETL Pipeline
 
 **Option A: CSV Source (default)**
 
@@ -101,20 +108,108 @@ bash scripts/run_etl_end_to_end.sh                  # CSV (default)
 bash scripts/run_etl_end_to_end.sh --source=iceberg # Iceberg/Parquet
 ```
 
-### 3. Launch Dashboard
+### 4. Launch Dashboard
 
 ```bash
 bash scripts/streamlit_start.sh
+# Dashboard available at http://localhost:8501
+
+bash scripts/streamlit_stop.sh
 ```
 
-Dashboard available at http://localhost:8501
-
-### 4. Tear Down
+### 5. Tear Down
 
 ```bash
 bash scripts/drop_objects.sh           # dry-run (shows what will be dropped)
 bash scripts/drop_objects.sh --confirm # actually drops everything
 ```
+
+## Project Structure
+
+```
+├── banking/                       # Schemachange migration root
+│   ├── _platform/
+│   │   └── V1.0.0__setup_schemas.sql
+│   ├── bronze/retail/
+│   │   └── V1.1.0__bronze_tables.sql
+│   ├── silver/retail/
+│   │   ├── V1.2.0__silver_tables.sql
+│   │   └── V1.4.0__silver_procedures.sql
+│   ├── gold/retail/
+│   │   ├── V1.3.0__gold_tables.sql
+│   │   ├── V1.5.0__gold_procedures.sql
+│   │   └── R__gold_views.sql
+│   ├── orchestration/
+│   │   ├── V1.6.0__orchestration.sql
+│   │   └── V1.7.1__ingestion_tasks.sql
+│   ├── reference/
+│   │   ├── V1.7.0__seed_data.sql
+│   │   └── V1.10.0__iceberg_objects.sql
+│   └── governance/
+│       ├── V1.8.0__masking_policies.sql
+│       ├── V1.9.0__data_quality.sql
+│       └── A__grants.sql
+├── scripts/                       # Deployment & ETL automation
+│   ├── deploy_schemachange.sh     # Primary deployer (schemachange)
+│   ├── deploy.sh                  # Legacy deployer
+│   ├── rollback.sh
+│   ├── run_smoke_tests.sh
+│   ├── run_historical.sh
+│   ├── run_incremental.sh
+│   ├── run_etl_end_to_end.sh
+│   ├── create_objects.sh
+│   ├── drop_objects.sh
+│   ├── create_iceberg_tables.py
+│   ├── streamlit_start.sh
+│   └── streamlit_stop.sh
+├── tests/
+│   ├── smoke_test.sql             # Post-deploy object checks
+│   └── integration_test.sql       # Deep validation
+├── .github/workflows/             # CI/CD pipelines
+│   ├── ci.yml                     # Lint + validate on PRs
+│   ├── deploy-qa.yml              # Deploy on push to release/*
+│   ├── deploy-preprod.yml         # Deploy on push to main
+│   └── deploy-prod.yml            # Deploy on tag v* or manual
+├── Teradata_Scripts/              # Original Teradata source SQL
+├── sample_data_file/              # CSV source data (history + incremental)
+├── iceberg_warehouse/             # Local Iceberg tables (Parquet + metadata)
+├── streamlit_app/                 # Multi-page Streamlit dashboard
+├── config/                        # Snowflake Git integration config
+├── environments.yml               # Environment config (dev/qa/preprod/prod)
+├── schemachange-config.yml        # Schemachange settings
+├── .sqlfluff                      # SQL lint rules
+└── DEVOPS_MANUAL.md               # Full operations manual
+```
+
+## CI/CD Pipeline
+
+| Workflow | Trigger | Action |
+|----------|---------|--------|
+| `ci.yml` | PR to `develop`, `release/*`, `main` | sqlfluff lint + script validation |
+| `deploy-qa.yml` | Push to `release/*` | Deploy to QA via schemachange |
+| `deploy-preprod.yml` | Push to `main` | Deploy to PreProd via schemachange |
+| `deploy-prod.yml` | Tag `v*` or manual dispatch | Deploy to Prod via schemachange |
+
+**Branching strategy:** `feature/*` → `develop` → `release/*` → `main` → tag `v*`
+
+## Environments
+
+| Environment | Database | Trigger |
+|-------------|----------|---------|
+| dev | `SSOM_COCO_DB` | Manual (local) |
+| qa | `SSOM_COCO_DB_QA` | Push to `release/*` |
+| preprod | `SSOM_COCO_DB_PREPROD` | Push to `main` |
+| prod | `SSOM_COCO_DB_PROD` | Tag `v*` |
+
+## Schemachange Conventions
+
+| Prefix | Meaning | Behavior |
+|--------|---------|----------|
+| `V<ver>__<name>.sql` | Versioned | Runs once, tracked in change history |
+| `R__<name>.sql` | Repeatable | Re-runs when file content changes |
+| `A__<name>.sql` | Always-run | Runs on every deployment |
+
+Template variables available in SQL: `{{ database }}`, `{{ warehouse }}`, `{{ role }}`, `{{ environment }}`
 
 ## Ingestion Options
 
@@ -125,45 +220,14 @@ bash scripts/drop_objects.sh --confirm # actually drops everything
 
 Both options load into the same Bronze tables. Downstream ETL (Silver/Gold), data quality checks, and masking policies are identical regardless of source.
 
-## Project Structure
-
-```
-├── Teradata_Scripts/          # Original Teradata source SQL
-├── Snowflake_Scripts/         # Converted Snowflake SQL (01-11)
-│   ├── 01_setup_schemas.sql
-│   ├── 02_bronze_tables.sql
-│   ├── 03_silver_tables.sql
-│   ├── 04_gold_tables.sql
-│   ├── 05_silver_procedures.sql
-│   ├── 06_gold_procedures.sql
-│   ├── 07_orchestration.sql
-│   ├── 08_seed_data.sql       # CSV stage, stream, tasks
-│   ├── 09_masking_policies.sql
-│   ├── 10_data_quality.sql
-│   └── 11_iceberg_objects.sql # Parquet stage + file format
-├── sample_data_file/          # CSV source data (history + incremental)
-├── iceberg_warehouse/         # Local Iceberg tables (Parquet + metadata)
-├── scripts/                   # Shell automation
-│   ├── create_objects.sh
-│   ├── drop_objects.sh
-│   ├── run_historical.sh
-│   ├── run_incremental.sh
-│   ├── run_etl_end_to_end.sh
-│   ├── create_iceberg_tables.py
-│   ├── streamlit_start.sh
-│   └── streamlit_stop.sh
-├── streamlit_app/             # Multi-page Streamlit dashboard
-└── config/                    # Snowflake Git integration config
-```
-
 ## Snowflake Target
 
 | Setting | Value |
 |---------|-------|
-| Connection | `HAKKODAINC_PARTNER` |
-| Database | `SSOM_COCO_DB` |
-| Warehouse | `SSOM_COCO_WH` |
-| Schemas | `BRONZE`, `SILVER`, `GOLD`, `GOVERNANCE` |
+| Account | `KXAXARZ-GW22129` |
+| Connection | `MY_TRIAL_ACCOUNT` |
+| Warehouse | `COMPUTE_WH` |
+| Schemas | `BRONZE`, `SILVER`, `GOLD`, `GOVERNANCE`, `METADATA` |
 
 ## Sample Data
 
@@ -172,3 +236,9 @@ Both options load into the same Bronze tables. Downstream ETL (Silver/Gold), dat
 | Customer | 20 | 10 (5 updates + 5 new) | Customer master data |
 | Account | 35 | 13 | Account records |
 | Transaction | 101 | 31 | Financial transactions |
+
+## Documentation
+
+- [`DEVOPS_MANUAL.md`](DEVOPS_MANUAL.md) — Full operations manual (deployment, rollback, secrets, incident response)
+- [`OPERATIONS.md`](OPERATIONS.md) — Operational runbooks
+- [`lineage.md`](lineage.md) — Data lineage documentation
