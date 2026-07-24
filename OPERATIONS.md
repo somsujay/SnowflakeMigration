@@ -149,7 +149,7 @@ bash scripts/streamlit_stop.sh
 
 | Workflow | Trigger | File |
 |----------|---------|------|
-| CI Lint & Validate | Push to `feature/*`, PR to `develop`, `release/*`, `main` | `.github/workflows/ci.yml` |
+| CI Lint & Validate | Push to `feature/**`, PR to `develop`, `release/*`, `main` | `.github/workflows/ci.yml` |
 | Deploy to DEV | Push to `develop` | `.github/workflows/deploy-dev.yml` |
 | Deploy to QA | Push to `release/*` | `.github/workflows/deploy-qa.yml` |
 | Deploy to Pre-PROD | Push to `main` | `.github/workflows/deploy-preprod.yml` |
@@ -159,6 +159,8 @@ bash scripts/streamlit_stop.sh
 
 1. **SQL Lint** — `sqlfluff lint banking/` with Snowflake dialect
 2. **Script Validation** — Verifies migration scripts exist with proper naming (V/R/A prefixes) and `environments.yml` structure
+
+> **Note:** Branch patterns use `feature/**` (double-star) to match nested branch names like `feature/JIRA-123/add-table`. A single `*` only matches one path segment. Additionally, the CI workflow only triggers when changed files fall within the listed `paths` (`banking/**`, `scripts/**`, `tests/**`, `environments.yml`, `schemachange-config.yml`, `.sqlfluff`) — pushes that only modify files outside these paths (e.g., README, docs) will not trigger the lint.
 
 ### Deployment Pipeline Steps
 

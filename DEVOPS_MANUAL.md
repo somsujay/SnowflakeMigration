@@ -136,6 +136,8 @@ The CI workflow:
 
 Path triggers: `banking/**`, `scripts/**`, `tests/**`, `environments.yml`, `schemachange-config.yml`, `.sqlfluff`
 
+> **Note:** Branch patterns use `feature/**` (double-star) to match nested branch names like `feature/JIRA-123/add-table`. A single `*` only matches one path segment. Additionally, the CI workflow only triggers when changed files fall within the listed `paths` — pushes that only modify files outside these paths (e.g., README, docs) will not trigger the lint.
+
 ### 3.5 Concurrency Controls
 
 All deploy workflows use concurrency groups to prevent parallel deployments:
