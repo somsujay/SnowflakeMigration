@@ -143,6 +143,8 @@ header() {
     echo ""
 }
 
+ROLE="${SNOWFLAKE_ROLE:-SYSADMIN}"
+
 run_sql_file() {
     local file="$1"
     local desc="$2"
@@ -159,7 +161,16 @@ run_sql_file() {
         return 0
     fi
 
-    snow sql -c "$CONN" --database "$DB" --warehouse "$WH" -f "$file"
+    # Render schemachange Jinja variables before executing
+    local rendered
+    rendered=$(sed \
+        -e "s/{{ *database *}}/${DB}/g" \
+        -e "s/{{ *warehouse *}}/${WH}/g" \
+        -e "s/{{ *role *}}/${ROLE}/g" \
+        -e "s/{{ *environment *}}/${ENV}/g" \
+        "$file")
+
+    echo "$rendered" | snow sql -c "$CONN" --database "$DB" --warehouse "$WH" -i
     echo "   [OK]"
     echo ""
 }
@@ -167,7 +178,7 @@ run_sql_file() {
 # ============================================================
 # DEPLOY
 # ============================================================
-header "DEPLOY TO ${ENV^^} (${DB})"
+header "DEPLOY TO $(echo "${ENV}" | tr '[:lower:]' '[:upper:]') (${DB})"
 
 echo "Environment: ${ENV}"
 echo "Database:    ${DB}"
@@ -183,39 +194,54 @@ if [[ "$ENV" == "prod" && "$DRY_RUN" != "true" ]]; then
     echo ""
 fi
 
-# Deploy scripts in order
-run_sql_file "${SQL_DIR}/01_setup_schemas.sql" \
+# Deploy versioned scripts (V*) in order, then repeatable (R*), then always-run (A*)
+run_sql_file "${SQL_DIR}/_platform/V1.0.0__setup_schemas.sql" \
     "Schemas (BRONZE, SILVER, GOLD, GOVERNANCE)"
 
-run_sql_file "${SQL_DIR}/02_bronze_tables.sql" \
+run_sql_file "${SQL_DIR}/bronze/retail/V1.1.0__bronze_tables.sql" \
     "Bronze tables, stage, stream, tasks"
 
-run_sql_file "${SQL_DIR}/03_silver_tables.sql" \
+run_sql_file "${SQL_DIR}/silver/retail/V1.2.0__silver_tables.sql" \
     "Silver dimension tables"
 
-run_sql_file "${SQL_DIR}/04_gold_tables.sql" \
+run_sql_file "${SQL_DIR}/gold/retail/V1.3.0__gold_tables.sql" \
     "Gold fact tables and views"
 
-run_sql_file "${SQL_DIR}/05_silver_procedures.sql" \
+run_sql_file "${SQL_DIR}/silver/retail/R__silver_procedures.sql" \
     "Silver ETL procedures (SCD-2, SCD-1)"
 
-run_sql_file "${SQL_DIR}/06_gold_procedures.sql" \
+run_sql_file "${SQL_DIR}/gold/retail/R__gold_procedures.sql" \
     "Gold ETL procedures"
 
-run_sql_file "${SQL_DIR}/07_orchestration.sql" \
+run_sql_file "${SQL_DIR}/gold/retail/R__gold_views.sql" \
+    "Gold views"
+
+run_sql_file "${SQL_DIR}/orchestration/R__orchestration.sql" \
     "Daily_ETL_Run() orchestrator"
 
-run_sql_file "${SQL_DIR}/08_seed_data.sql" \
+run_sql_file "${SQL_DIR}/orchestration/R__ingestion_tasks.sql" \
+    "Ingestion tasks"
+
+run_sql_file "${SQL_DIR}/reference/R__seed_data.sql" \
     "Seed/reference data"
 
-run_sql_file "${SQL_DIR}/09_masking_policies.sql" \
-    "Governance masking policies"
+run_sql_file "${SQL_DIR}/governance/V1.4.0__masking_policies.sql" \
+    "Governance masking policies (versioned)"
 
-run_sql_file "${SQL_DIR}/10_data_quality.sql" \
-    "Data quality framework"
+run_sql_file "${SQL_DIR}/governance/R__masking_policies.sql" \
+    "Governance masking policies (repeatable)"
 
-run_sql_file "${SQL_DIR}/11_iceberg_objects.sql" \
+run_sql_file "${SQL_DIR}/governance/V1.5.0__data_quality.sql" \
+    "Data quality framework (versioned)"
+
+run_sql_file "${SQL_DIR}/governance/R__data_quality_procedures.sql" \
+    "Data quality procedures (repeatable)"
+
+run_sql_file "${SQL_DIR}/reference/R__iceberg_objects.sql" \
     "Iceberg/Parquet ingestion objects"
+
+run_sql_file "${SQL_DIR}/governance/A__grants.sql" \
+    "Grants (always-run)"
 
 # ============================================================
 # SUMMARY
@@ -224,8 +250,8 @@ if [[ "$DRY_RUN" == "true" ]]; then
     header "DRY-RUN COMPLETE"
     echo "No changes were made. Re-run without --dry-run to deploy."
 else
-    header "DEPLOYMENT COMPLETE: ${ENV^^}"
-    echo "Deployed 11 SQL scripts to ${DB}."
+    header "DEPLOYMENT COMPLETE: $(echo "${ENV}" | tr '[:lower:]' '[:upper:]')"
+    echo "Deployed 16 SQL scripts to ${DB}."
     echo ""
     echo "Next: Run smoke tests with:"
     echo "  bash scripts/run_smoke_tests.sh --env=${ENV}"

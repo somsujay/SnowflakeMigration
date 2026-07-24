@@ -2,14 +2,7 @@ name: CI – Lint & Validate
 
 on:
   push:
-    branches: ['feature/*']
-    paths:
-      - 'banking/**'
-      - 'scripts/**'
-      - 'tests/**'
-      - 'environments.yml'
-      - 'schemachange-config.yml'
-      - '.sqlfluff'
+    branches: ['feature', 'feature/**']
   pull_request:
     branches: [develop, 'release/*', main]
     paths:
