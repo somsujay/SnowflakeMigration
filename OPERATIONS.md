@@ -42,7 +42,7 @@ All environments are defined in `environments.yml`:
 
 | Environment | Database | Warehouse | Trigger |
 |-------------|----------|-----------|---------|
-| dev | SSOM_COCO_DB | COMPUTE_WH | Manual |
+| dev | SSOM_COCO_DB | COMPUTE_WH | Push to `develop` |
 | qa | SSOM_COCO_DB_QA | COMPUTE_WH | Push to `release/*` |
 | preprod | SSOM_COCO_DB_PREPROD | COMPUTE_WH | Push to `main` |
 | prod | SSOM_COCO_DB_PROD | COMPUTE_WH | Tag `v*` |
@@ -94,12 +94,13 @@ bash scripts/deploy_schemachange.sh --env=prod --dry-run
 
 ```bash
 # Historical load (full reset + initial data)
-bash scripts/run_historical.sh                  # CSV source (default)
-bash scripts/run_historical.sh --source=iceberg # Iceberg/Parquet source
+bash scripts/run_historical.sh --env=dev                  # CSV source (default)
+bash scripts/run_historical.sh --env=dev --source=iceberg # Iceberg/Parquet source
+bash scripts/run_historical.sh --env=qa                   # Target QA environment
 
 # Incremental load (requires historical load first)
-bash scripts/run_incremental.sh                  # CSV source (default)
-bash scripts/run_incremental.sh --source=iceberg # Iceberg/Parquet source
+bash scripts/run_incremental.sh --env=dev                  # CSV source (default)
+bash scripts/run_incremental.sh --env=dev --source=iceberg # Iceberg/Parquet source
 ```
 
 ### Testing
@@ -148,7 +149,8 @@ bash scripts/streamlit_stop.sh
 
 | Workflow | Trigger | File |
 |----------|---------|------|
-| CI Lint & Validate | PR to `develop`, `release/*`, `main` | `.github/workflows/ci.yml` |
+| CI Lint & Validate | Push to `feature/**`, PR to `develop`, `release/*`, `main` | `.github/workflows/ci.yml` |
+| Deploy to DEV | Push to `develop` | `.github/workflows/deploy-dev.yml` |
 | Deploy to QA | Push to `release/*` | `.github/workflows/deploy-qa.yml` |
 | Deploy to Pre-PROD | Push to `main` | `.github/workflows/deploy-preprod.yml` |
 | Deploy to PROD | Tag `v*` or manual dispatch | `.github/workflows/deploy-prod.yml` |
@@ -158,11 +160,34 @@ bash scripts/streamlit_stop.sh
 1. **SQL Lint** — `sqlfluff lint banking/` with Snowflake dialect
 2. **Script Validation** — Verifies migration scripts exist with proper naming (V/R/A prefixes) and `environments.yml` structure
 
+> **Note:** Branch patterns use `feature/**` (double-star) to match nested branch names like `feature/JIRA-123/add-table`. A single `*` only matches one path segment. Additionally, the CI workflow only triggers when changed files fall within the listed `paths` (`banking/**`, `scripts/**`, `tests/**`, `environments.yml`, `schemachange-config.yml`, `.sqlfluff`) — pushes that only modify files outside these paths (e.g., README, docs) will not trigger the lint.
+
+> **Important:** GitHub Actions reads the workflow file from the branch being pushed. If your feature branch was created before `ci.yml` was updated with the `push` trigger, the workflow won't fire because the branch still has the old version of `ci.yml`. Fix by rebasing or merging from `develop`:
+> ```bash
+> git checkout feature/xyz
+> git merge develop   # brings in the updated ci.yml
+> git push
+> ```
+
 ### Deployment Pipeline Steps
 
 1. **Deploy** — Runs `deploy_schemachange.sh` for the target environment (applies only unapplied migrations)
 2. **Smoke Tests** — Validates all objects were created
 3. **Integration/Regression Tests** — Validates object counts, procedures, policies
+
+### Branch Guard (Merge Path Enforcement)
+
+The `branch-guard.yml` workflow blocks PRs that violate the branching flow. Allowed paths:
+
+| Source | Target | Allowed |
+|--------|--------|---------|
+| `feature` / `feature/*` | `develop` | Yes |
+| `develop` | `release/*` | Yes |
+| `release/*` | `main` | Yes |
+| `hotfix/*` | `main` | Yes |
+| Any other combination | — | **Blocked** |
+
+To make this a hard gate, mark **"Enforce Branching Rules"** as a required status check in GitHub branch protection settings for `develop`, `release/*`, and `main`.
 
 ### Production Rollback (Manual)
 

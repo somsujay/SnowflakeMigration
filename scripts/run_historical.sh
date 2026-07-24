@@ -4,9 +4,9 @@
 # Reset environment + Load history data + Run ETL + Validate
 #
 # Usage:
-#   bash run_historical.sh                 # Default: CSV source
-#   bash run_historical.sh --source=csv    # Explicit: CSV source
-#   bash run_historical.sh --source=iceberg # Iceberg/Parquet source
+#   bash run_historical.sh --env=dev                  # Default: CSV source
+#   bash run_historical.sh --env=qa --source=csv      # Explicit: CSV source
+#   bash run_historical.sh --env=dev --source=iceberg # Iceberg/Parquet source
 #
 # Flow:
 #   1. Reset (suspend tasks, remove stage files, truncate all)
@@ -20,14 +20,10 @@
 
 set -e
 
-# --- Configuration ---
-CONN="${SNOWFLAKE_CONNECTION:-MY_TRIAL_ACCOUNT}"
-DB="${SNOWFLAKE_DATABASE:-SSOM_COCO_DB}"
-WH="${SNOWFLAKE_WAREHOUSE:-COMPUTE_WH}"
-
 # Resolve project root (parent of scripts/)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+ENV_FILE="${PROJECT_DIR}/environments.yml"
 DATA_DIR="${PROJECT_DIR}/sample_data_file"
 ICEBERG_DIR="${PROJECT_DIR}/iceberg_warehouse/teradata_migration"
 
@@ -36,11 +32,14 @@ TASK_WAIT=15
 
 # --- Parse Arguments ---
 SOURCE="csv"
+ENV=""
 for arg in "$@"; do
     case $arg in
         --source=*)
             SOURCE="${arg#*=}"
-            shift
+            ;;
+        --env=*)
+            ENV="${arg#*=}"
             ;;
     esac
 done
@@ -48,6 +47,33 @@ done
 if [[ "$SOURCE" != "csv" && "$SOURCE" != "iceberg" ]]; then
     echo "ERROR: Invalid --source value '${SOURCE}'. Must be 'csv' or 'iceberg'."
     exit 1
+fi
+
+# --- Resolve environment configuration ---
+parse_env_value() {
+    local key="$1"
+    awk -v env="$ENV" -v key="$key" '
+        $0 ~ "^"env":" { found=1; next }
+        found && /^[a-z]/ { found=0 }
+        found && $1 == key":" { print $2 }
+    ' "$ENV_FILE"
+}
+
+if [[ -n "$ENV" ]]; then
+    DB=$(parse_env_value "database")
+    WH=$(parse_env_value "warehouse")
+    CONN=$(parse_env_value "connection")
+    if [[ -z "$DB" || -z "$WH" || -z "$CONN" ]]; then
+        echo "ERROR: Could not parse environment '${ENV}' from ${ENV_FILE}"
+        echo "Available environments: dev, qa, preprod, prod"
+        exit 1
+    fi
+else
+    # Fallback to env vars or defaults (backwards compatible)
+    CONN="${SNOWFLAKE_CONNECTION:-MY_TRIAL_ACCOUNT}"
+    DB="${SNOWFLAKE_DATABASE:-SSOM_COCO_DB}"
+    WH="${SNOWFLAKE_WAREHOUSE:-COMPUTE_WH}"
+    ENV="dev"
 fi
 
 # --- Helper Functions ---
