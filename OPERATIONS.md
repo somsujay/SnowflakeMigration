@@ -42,7 +42,7 @@ All environments are defined in `environments.yml`:
 
 | Environment | Database | Warehouse | Trigger |
 |-------------|----------|-----------|---------|
-| dev | SSOM_COCO_DB | COMPUTE_WH | Manual |
+| dev | SSOM_COCO_DB | COMPUTE_WH | Push to `develop` |
 | qa | SSOM_COCO_DB_QA | COMPUTE_WH | Push to `release/*` |
 | preprod | SSOM_COCO_DB_PREPROD | COMPUTE_WH | Push to `main` |
 | prod | SSOM_COCO_DB_PROD | COMPUTE_WH | Tag `v*` |
@@ -94,12 +94,13 @@ bash scripts/deploy_schemachange.sh --env=prod --dry-run
 
 ```bash
 # Historical load (full reset + initial data)
-bash scripts/run_historical.sh                  # CSV source (default)
-bash scripts/run_historical.sh --source=iceberg # Iceberg/Parquet source
+bash scripts/run_historical.sh --env=dev                  # CSV source (default)
+bash scripts/run_historical.sh --env=dev --source=iceberg # Iceberg/Parquet source
+bash scripts/run_historical.sh --env=qa                   # Target QA environment
 
 # Incremental load (requires historical load first)
-bash scripts/run_incremental.sh                  # CSV source (default)
-bash scripts/run_incremental.sh --source=iceberg # Iceberg/Parquet source
+bash scripts/run_incremental.sh --env=dev                  # CSV source (default)
+bash scripts/run_incremental.sh --env=dev --source=iceberg # Iceberg/Parquet source
 ```
 
 ### Testing
@@ -148,7 +149,8 @@ bash scripts/streamlit_stop.sh
 
 | Workflow | Trigger | File |
 |----------|---------|------|
-| CI Lint & Validate | PR to `develop`, `release/*`, `main` | `.github/workflows/ci.yml` |
+| CI Lint & Validate | Push to `feature/*`, PR to `develop`, `release/*`, `main` | `.github/workflows/ci.yml` |
+| Deploy to DEV | Push to `develop` | `.github/workflows/deploy-dev.yml` |
 | Deploy to QA | Push to `release/*` | `.github/workflows/deploy-qa.yml` |
 | Deploy to Pre-PROD | Push to `main` | `.github/workflows/deploy-preprod.yml` |
 | Deploy to PROD | Tag `v*` or manual dispatch | `.github/workflows/deploy-prod.yml` |
