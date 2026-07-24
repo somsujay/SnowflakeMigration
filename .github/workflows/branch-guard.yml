@@ -1,0 +1,61 @@
+name: Branch Guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  enforce-branch-flow:
+    name: Enforce Branching Rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch targeting rules
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+        run: |
+          echo "PR: ${HEAD} → ${BASE}"
+          echo ""
+
+          # Define allowed merge paths:
+          #   feature/* or feature → develop
+          #   develop             → release/*
+          #   release/*           → main
+          #   hotfix/*            → main
+
+          ALLOWED=false
+
+          # feature → develop
+          if [[ "$BASE" == "develop" ]]; then
+            if [[ "$HEAD" == feature* ]]; then
+              ALLOWED=true
+            fi
+          fi
+
+          # develop → release/*
+          if [[ "$BASE" == release/* ]]; then
+            if [[ "$HEAD" == "develop" ]]; then
+              ALLOWED=true
+            fi
+          fi
+
+          # release/* → main
+          if [[ "$BASE" == "main" ]]; then
+            if [[ "$HEAD" == release/* || "$HEAD" == hotfix/* ]]; then
+              ALLOWED=true
+            fi
+          fi
+
+          if [[ "$ALLOWED" != "true" ]]; then
+            echo ""
+            echo "::error::Branch '${HEAD}' is not allowed to merge into '${BASE}'."
+            echo ""
+            echo "Allowed merge paths:"
+            echo "  feature/* → develop"
+            echo "  develop   → release/*"
+            echo "  release/* → main"
+            echo "  hotfix/*  → main"
+            exit 1
+          fi
+
+          echo "✓ Branch flow is valid: ${HEAD} → ${BASE}"
