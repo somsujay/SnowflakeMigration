@@ -18,22 +18,22 @@ jobs:
           echo ""
 
           # Define allowed merge paths:
-          #   feature/* or feature → develop
-          #   develop             → release/*
-          #   release/*           → main
-          #   hotfix/*            → main
+          #   feature or feature/* → develop
+          #   develop              → release or release/*
+          #   release or release/* → main
+          #   hotfix or hotfix/*   → main
 
           ALLOWED=false
 
           # feature → develop
           if [[ "$BASE" == "develop" ]]; then
-            if [[ "$HEAD" == feature* ]]; then
+            if [[ "$HEAD" == "feature" || "$HEAD" == feature/* ]]; then
               ALLOWED=true
             fi
           fi
 
           # develop → release/*
-          if [[ "$BASE" == release/* ]]; then
+          if [[ "$BASE" == "release" || "$BASE" == release/* ]]; then
             if [[ "$HEAD" == "develop" ]]; then
               ALLOWED=true
             fi
@@ -41,7 +41,7 @@ jobs:
 
           # release/* → main
           if [[ "$BASE" == "main" ]]; then
-            if [[ "$HEAD" == release/* || "$HEAD" == hotfix/* ]]; then
+            if [[ "$HEAD" == "release" || "$HEAD" == release/* || "$HEAD" == "hotfix" || "$HEAD" == hotfix/* ]]; then
               ALLOWED=true
             fi
           fi
@@ -51,10 +51,10 @@ jobs:
             echo "::error::Branch '${HEAD}' is not allowed to merge into '${BASE}'."
             echo ""
             echo "Allowed merge paths:"
-            echo "  feature/* → develop"
-            echo "  develop   → release/*"
-            echo "  release/* → main"
-            echo "  hotfix/*  → main"
+            echo "  feature or feature/* → develop"
+            echo "  develop              → release or release/*"
+            echo "  release or release/* → main"
+            echo "  hotfix or hotfix/*   → main"
             exit 1
           fi
 
