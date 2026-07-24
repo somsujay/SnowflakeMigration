@@ -1,0 +1,62 @@
+name: Deploy to DEV
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'banking/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'environments.yml'
+      - 'schemachange-config.yml'
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to DEV
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install schemachange snowflake-cli-labs
+
+      - name: Deploy with schemachange
+        run: |
+          mkdir -p ~/.snowflake && chmod 700 ~/.snowflake
+          echo "$SNOWFLAKE_PRIVATE_KEY" > ~/.snowflake/ci_key.p8
+          chmod 600 ~/.snowflake/ci_key.p8
+          chmod +x scripts/deploy_schemachange.sh
+          bash scripts/deploy_schemachange.sh --env=dev
+
+  smoke-test:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: deploy
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Snowflake CLI
+        run: pip install snowflake-cli-labs
+
+      - name: Run smoke tests
+        run: |
+          chmod +x scripts/run_smoke_tests.sh
+          bash scripts/run_smoke_tests.sh --env=dev
