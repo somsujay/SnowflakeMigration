@@ -145,8 +145,5 @@ EXCEPTION
         RETURN 'ERROR in Daily_ETL_Run at step [' || current_step || ']: ' || SQLCODE || ' - ' || SQLERRM || ' (SQLSTATE: ' || SQLSTATE || ')';
 END;
 
-sujaysom@Sujays-MacBook-Pro SnowflakeMigration % git push
-git@github.com: Permission denied (publickey).
-fatal: Could not read from remote repository.
 
 $$;
