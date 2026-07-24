@@ -1,7 +1,7 @@
 /* ============================================================
    schemachange Repeatable: R__gold_procedures.sql
    PURPOSE : Gold layer procedures - fact table loading
-   Re-runs automatically when this file changes.
+   Re-runs automatically when this file changes. Sujay
    ============================================================ */
 
 USE DATABASE {{ database }};
@@ -144,4 +144,6 @@ EXCEPTION
     WHEN OTHER THEN
         RETURN 'ERROR in Daily_ETL_Run at step [' || current_step || ']: ' || SQLCODE || ' - ' || SQLERRM || ' (SQLSTATE: ' || SQLSTATE || ')';
 END;
+
+
 $$;

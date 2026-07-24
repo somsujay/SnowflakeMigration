@@ -1,6 +1,6 @@
 /* ============================================================
    schemachange Migration: V1.6.0__orchestration.sql
-   PURPOSE : Master ETL orchestration procedure
+   PURPOSE : Master ETL orchestration procedure - Sujay Som
    ============================================================ */
 
 USE DATABASE {{ database }};

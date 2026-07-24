@@ -1,6 +1,8 @@
 name: CI – Lint & Validate
 
 on:
+  push:
+    branches: ['feature', 'feature/**']
   pull_request:
     branches: [develop, 'release/*', main]
     paths:

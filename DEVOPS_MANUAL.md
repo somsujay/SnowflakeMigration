@@ -7,18 +7,18 @@
 │                        GitHub Repository                         │
 ├─────────────────────────────────────────────────────────────────┤
 │  feature/* ──PR──► develop ──PR──► release/* ──PR──► main ──tag──► v*  │
-│       │                                │              │              │  │
-│       ▼                                ▼              ▼              ▼  │
-│   CI Lint                         Deploy QA     Deploy PreProd  Deploy Prod │
+│       │              │              │              │              │  │
+│       ▼              ▼              ▼              ▼              ▼  │
+│   CI Lint       Deploy DEV     Deploy QA     Deploy PreProd  Deploy Prod │
 └─────────────────────────────────────────────────────────────────┘
-                                         │              │              │
-                                         ▼              ▼              ▼
+                       │              │              │              │
+                       ▼              ▼              ▼              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Snowflake (KXAXARZ-GW22129)                  │
 ├─────────────────────────────────────────────────────────────────┤
-│  SSOM_COCO_DB_QA  │  SSOM_COCO_DB_PREPROD  │  SSOM_COCO_DB_PROD │
-│                   │                         │                     │
-│  Warehouse: COMPUTE_WH (shared, XS)                              │
+│  SSOM_COCO_DB  │  SSOM_COCO_DB_QA  │  SSOM_COCO_DB_PREPROD  │  SSOM_COCO_DB_PROD │
+│                │                    │                         │                     │
+│  Warehouse: COMPUTE_WH (shared, XS)                                                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -98,12 +98,26 @@ SELECT * FROM SSOM_COCO_DB.METADATA.SCHEMACHANGE_HISTORY ORDER BY INSTALLED_ON D
 
 | File | Purpose | Trigger |
 |------|---------|---------|
-| `.github/workflows/ci.yml` | Lint + validate | PR to `develop`, `release/*`, `main` |
+| `.github/workflows/ci.yml` | Lint + validate | Push to `feature/*`, PR to `develop`, `release/*`, `main` |
+| `.github/workflows/deploy-dev.yml` | Deploy + smoke test DEV | Push to `develop` |
 | `.github/workflows/deploy-qa.yml` | Deploy + test QA | Push to `release/*` |
 | `.github/workflows/deploy-preprod.yml` | Deploy + test PreProd | Push to `main` |
 | `.github/workflows/deploy-prod.yml` | Deploy + validate Prod | Tag `v*` or manual dispatch |
 
-### 3.2 Pipeline Stages
+### 3.2 Branching Strategy
+
+| Branch | Trigger | Pipeline Action |
+|--------|---------|-----------------|
+| `feature/*` | Push | CI lint & validate |
+| `feature/*` → `develop` | PR | CI lint & validate |
+| `develop` | Push (merge) | Deploy to DEV |
+| `develop` → `release/*` | PR | CI lint & validate |
+| `release/*` | Push (merge) | Deploy to QA + smoke + integration tests |
+| `release/*` → `main` | PR | CI lint & validate |
+| `main` | Push (merge) | Deploy to Pre-PROD + smoke + regression tests |
+| Tag `v*` on `main` | Tag push | Deploy to PROD + smoke + data validation |
+
+### 3.3 Pipeline Stages
 
 ```
 ┌──────────────┐    ┌───────────────────┐    ┌─────────────────┐    ┌──────────────┐
@@ -112,7 +126,7 @@ SELECT * FROM SSOM_COCO_DB.METADATA.SCHEMACHANGE_HISTORY ORDER BY INSTALLED_ON D
 └──────────────┘    └───────────────────┘    └─────────────────┘    └──────────────┘
 ```
 
-### 3.3 CI Lint Job Details
+### 3.4 CI Lint Job Details
 
 The CI workflow:
 1. Lints `banking/` with sqlfluff
@@ -122,7 +136,16 @@ The CI workflow:
 
 Path triggers: `banking/**`, `scripts/**`, `tests/**`, `environments.yml`, `schemachange-config.yml`, `.sqlfluff`
 
-### 3.4 Concurrency Controls
+> **Note:** Branch patterns use `feature/**` (double-star) to match nested branch names like `feature/JIRA-123/add-table`. A single `*` only matches one path segment. Additionally, the CI workflow only triggers when changed files fall within the listed `paths` — pushes that only modify files outside these paths (e.g., README, docs) will not trigger the lint.
+
+> **Important:** GitHub Actions reads the workflow file from the branch being pushed. If your feature branch was created before `ci.yml` was updated with the `push` trigger, the workflow won't fire because the branch still has the old version of `ci.yml`. Fix by rebasing or merging from `develop`:
+> ```bash
+> git checkout feature/xyz
+> git merge develop   # brings in the updated ci.yml
+> git push
+> ```
+
+### 3.5 Concurrency Controls
 
 All deploy workflows use concurrency groups to prevent parallel deployments:
 
@@ -931,8 +954,8 @@ gh pr create --base develop --title "Test: verify CI pipeline" --body "Testing C
 | `scripts/deploy.sh` | Legacy deployment (numbered scripts) | `--env=<env> [--dry-run]` |
 | `scripts/rollback.sh` | Rollback to a git version | `--env=<env> --version=<tag>` |
 | `scripts/run_smoke_tests.sh` | Post-deploy smoke tests | `--env=<env>` |
-| `scripts/run_historical.sh` | Load historical data | — |
-| `scripts/run_incremental.sh` | Load incremental data | — |
+| `scripts/run_historical.sh` | Load historical data | `--env=<env> [--source=csv\|iceberg]` |
+| `scripts/run_incremental.sh` | Load incremental data | `--env=<env> [--source=csv\|iceberg]` |
 | `scripts/run_etl_end_to_end.sh` | Full ETL pipeline run | — |
 | `scripts/create_objects.sh` | Create all Snowflake objects | — |
 | `scripts/drop_objects.sh` | Drop all Snowflake objects | `--confirm` |
