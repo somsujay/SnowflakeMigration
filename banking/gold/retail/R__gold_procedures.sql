@@ -145,4 +145,3 @@ EXCEPTION
         RETURN 'ERROR in Daily_ETL_Run at step [' || current_step || ']: ' || SQLCODE || ' - ' || SQLERRM || ' (SQLSTATE: ' || SQLSTATE || ')';
 END;
 $$;
-
