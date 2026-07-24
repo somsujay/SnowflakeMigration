@@ -162,6 +162,13 @@ bash scripts/streamlit_stop.sh
 
 > **Note:** Branch patterns use `feature/**` (double-star) to match nested branch names like `feature/JIRA-123/add-table`. A single `*` only matches one path segment. Additionally, the CI workflow only triggers when changed files fall within the listed `paths` (`banking/**`, `scripts/**`, `tests/**`, `environments.yml`, `schemachange-config.yml`, `.sqlfluff`) — pushes that only modify files outside these paths (e.g., README, docs) will not trigger the lint.
 
+> **Important:** GitHub Actions reads the workflow file from the branch being pushed. If your feature branch was created before `ci.yml` was updated with the `push` trigger, the workflow won't fire because the branch still has the old version of `ci.yml`. Fix by rebasing or merging from `develop`:
+> ```bash
+> git checkout feature/xyz
+> git merge develop   # brings in the updated ci.yml
+> git push
+> ```
+
 ### Deployment Pipeline Steps
 
 1. **Deploy** — Runs `deploy_schemachange.sh` for the target environment (applies only unapplied migrations)
