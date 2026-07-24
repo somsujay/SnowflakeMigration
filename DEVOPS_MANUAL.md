@@ -155,6 +155,31 @@ concurrency:
   cancel-in-progress: false   # Never cancel an in-flight deploy
 ```
 
+### 3.6 Branch Guard (Merge Path Enforcement)
+
+The `branch-guard.yml` workflow automatically blocks PRs that don't follow the allowed branching flow. It runs on every PR and fails if the source → target combination is invalid.
+
+**Allowed merge paths:**
+
+| Source Branch | Target Branch | Allowed |
+|---------------|---------------|---------|
+| `feature` / `feature/*` | `develop` | Yes |
+| `develop` | `release/*` | Yes |
+| `release/*` | `main` | Yes |
+| `hotfix/*` | `main` | Yes |
+| Any other combination | — | **Blocked** |
+
+**File:** `.github/workflows/branch-guard.yml`
+
+**Making it a required check (recommended):**
+
+1. Go to GitHub repo Settings > Branches
+2. Add/edit branch protection rules for `develop`, `release/*`, and `main`
+3. Enable "Require status checks to pass before merging"
+4. Search for and select **"Enforce Branching Rules"**
+
+This prevents PRs from being merged even if someone force-approves a review.
+
 ---
 
 ## 4. Secrets Management

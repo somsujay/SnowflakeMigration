@@ -175,6 +175,20 @@ bash scripts/streamlit_stop.sh
 2. **Smoke Tests** — Validates all objects were created
 3. **Integration/Regression Tests** — Validates object counts, procedures, policies
 
+### Branch Guard (Merge Path Enforcement)
+
+The `branch-guard.yml` workflow blocks PRs that violate the branching flow. Allowed paths:
+
+| Source | Target | Allowed |
+|--------|--------|---------|
+| `feature` / `feature/*` | `develop` | Yes |
+| `develop` | `release/*` | Yes |
+| `release/*` | `main` | Yes |
+| `hotfix/*` | `main` | Yes |
+| Any other combination | — | **Blocked** |
+
+To make this a hard gate, mark **"Enforce Branching Rules"** as a required status check in GitHub branch protection settings for `develop`, `release/*`, and `main`.
+
 ### Production Rollback (Manual)
 
 Trigger via GitHub Actions UI:
