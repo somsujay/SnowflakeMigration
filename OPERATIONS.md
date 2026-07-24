@@ -193,15 +193,17 @@ All migrations live in `banking/` and are managed by [schemachange](https://gith
 | V1.1.0 | `bronze/retail/` | T_Customer, T_Account, T_Transaction |
 | V1.2.0 | `silver/retail/` | DimCustomer, DimAccount, DimTransactionType, DimDate |
 | V1.3.0 | `gold/retail/` | FactDailyTransaction, FactDailyAgg |
-| V1.4.0 | `silver/retail/` | SCD-2 (Customer), SCD-1 (Account), dimension loaders |
-| V1.5.0 | `gold/retail/` | Fact table loaders, aggregation procedures |
-| V1.6.0 | `orchestration/` | Daily_ETL_Run() master orchestrator |
-| V1.7.0 | `reference/` | CSV_FORMAT, DATA_STAGE, STREAM_DATA_FILES |
-| V1.7.1 | `orchestration/` | TASK_LOAD_CUSTOMER, TASK_LOAD_ACCOUNT, TASK_LOAD_TRANSACTION |
-| V1.8.0 | `governance/` | Masking policies (NAME, EMAIL, PHONE, LOCATION, FINANCIAL_ID, AMOUNT) |
-| V1.9.0 | `governance/` | DATA_QUALITY_LOG, Cleanse_Bronze_Data(), Run_Data_Quality_Checks() |
-| V1.10.0 | `reference/` | PARQUET_FORMAT, ICEBERG_STAGE |
+| V1.4.0 | `governance/` | Masking policies (NAME, EMAIL, PHONE, LOCATION, FINANCIAL_ID, AMOUNT) |
+| V1.5.0 | `governance/` | DATA_QUALITY_LOG table |
+| R__ | `silver/retail/` | SCD-2 (Customer), SCD-1 (Account), dimension loaders |
+| R__ | `gold/retail/` | Fact table loaders, aggregation procedures |
 | R__ | `gold/retail/` | MonthlySpendProfile, TxnTypeTrend views |
+| R__ | `orchestration/` | Daily_ETL_Run() master orchestrator |
+| R__ | `orchestration/` | TASK_LOAD_CUSTOMER, TASK_LOAD_ACCOUNT, TASK_LOAD_TRANSACTION |
+| R__ | `reference/` | CSV_FORMAT, DATA_STAGE, STREAM_DATA_FILES |
+| R__ | `reference/` | PARQUET_FORMAT, ICEBERG_STAGE |
+| R__ | `governance/` | Masking policy definitions & column assignments |
+| R__ | `governance/` | Cleanse_Bronze_Data(), Run_Data_Quality_Checks() |
 | A__ | `governance/` | Schema grants and future privileges |
 
 ### Change History Table

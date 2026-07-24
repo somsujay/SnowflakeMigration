@@ -36,20 +36,22 @@ banking/
 │   └── V1.1.0__bronze_tables.sql         # Bronze tables, stages, streams, tasks
 ├── silver/retail/
 │   ├── V1.2.0__silver_tables.sql         # Silver dimension tables
-│   └── V1.4.0__silver_procedures.sql     # Silver ETL procedures (SCD-2, SCD-1)
+│   └── R__silver_procedures.sql          # Repeatable: Silver ETL procedures (SCD-2, SCD-1)
 ├── gold/retail/
 │   ├── V1.3.0__gold_tables.sql           # Gold fact tables
-│   ├── V1.5.0__gold_procedures.sql       # Gold ETL procedures
+│   ├── R__gold_procedures.sql            # Repeatable: Gold ETL procedures
 │   └── R__gold_views.sql                 # Repeatable: Gold views (re-run every deploy)
 ├── orchestration/
-│   ├── V1.6.0__orchestration.sql         # Daily_ETL_Run() orchestrator
-│   └── V1.7.1__ingestion_tasks.sql       # Ingestion task definitions
+│   ├── R__orchestration.sql              # Repeatable: Daily_ETL_Run() orchestrator
+│   └── R__ingestion_tasks.sql            # Repeatable: Ingestion task definitions
 ├── reference/
-│   ├── V1.7.0__seed_data.sql             # Seed/reference data
-│   └── V1.10.0__iceberg_objects.sql      # Iceberg/Parquet ingestion objects
+│   ├── R__seed_data.sql                  # Repeatable: Seed/reference data
+│   └── R__iceberg_objects.sql            # Repeatable: Iceberg/Parquet ingestion objects
 └── governance/
-    ├── V1.8.0__masking_policies.sql      # Governance masking policies
-    ├── V1.9.0__data_quality.sql          # Data quality framework
+    ├── V1.4.0__masking_policies.sql      # Masking policy table/setup
+    ├── V1.5.0__data_quality.sql          # DATA_QUALITY_LOG table creation
+    ├── R__masking_policies.sql           # Repeatable: Masking policy definitions & assignments
+    ├── R__data_quality_procedures.sql    # Repeatable: Data quality procedures
     └── A__grants.sql                     # Always-run: grants (re-applied every deploy)
 ```
 
