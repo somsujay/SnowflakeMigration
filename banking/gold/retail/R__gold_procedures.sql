@@ -146,7 +146,7 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE GOLD.Daily_ETL_Run()
+CREATE OR REPLACE PROCEDURE GOLD.Daily_ETL_Run_2()
 RETURNS STRING
 LANGUAGE SQL
 AS
@@ -184,4 +184,5 @@ EXCEPTION
         RETURN 'ERROR in Daily_ETL_Run at step [' || current_step || ']: ' || SQLCODE || ' - ' || SQLERRM || ' (SQLSTATE: ' || SQLSTATE || ')';
 END;
 $$;
+
 
