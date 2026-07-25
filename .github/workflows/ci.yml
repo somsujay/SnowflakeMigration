@@ -4,7 +4,7 @@ on:
   push:
     branches: ['feature', 'feature/**']
   pull_request:
-    branches: [develop, 'release/*', main]
+    branches: [develop, release, 'release/*', main]
     paths:
       - 'banking/**'
       - 'scripts/**'
