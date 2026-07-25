@@ -2,7 +2,7 @@ name: Deploy to QA
 
 on:
   push:
-    branches: ['release/*']
+    branches: [release, 'release/*']
     paths:
       - 'banking/**'
       - 'scripts/**'
