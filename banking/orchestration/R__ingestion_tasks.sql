@@ -1,7 +1,7 @@
 /* ============================================================
    schemachange Migration: V1.7.1__ingestion_tasks.sql
    PURPOSE : Scheduled tasks for auto-ingesting CSVs from stage
-   DEPENDS : V1.7.0 (stage, stream, file format must exist)
+   DEPENDS : V1.7.0 (stage, stream, file format must exist) -- Sujay Som
    ============================================================ */
 
 USE DATABASE {{ database }};
