@@ -1,7 +1,7 @@
 /* ============================================================
    schemachange Repeatable: R__gold_procedures.sql
    PURPOSE : Gold layer procedures - fact table loading
-   Re-runs automatically when this file changes. Sujay Som aa
+   Re-runs automatically when this file changes. Sujay Som Again
    ============================================================ */
 
 USE DATABASE {{ database }};
