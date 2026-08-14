@@ -1,0 +1,32 @@
+/* ============================================================
+   Domain   : governance
+   Layer    : n/a
+   Release  : 1
+   Sequence : 100
+   Purpose  : Create application roles for domain access
+   Author   : team-governance
+   ============================================================ */
+
+USE ROLE SECURITYADMIN;
+
+-- Domain reader roles
+CREATE ROLE IF NOT EXISTS RL_ECOMM_READER;
+CREATE ROLE IF NOT EXISTS RL_BOOKINGS_READER;
+CREATE ROLE IF NOT EXISTS RL_AFTERMARKET_READER;
+CREATE ROLE IF NOT EXISTS RL_UDS_READER;
+
+-- Domain writer roles
+CREATE ROLE IF NOT EXISTS RL_ECOMM_WRITER;
+CREATE ROLE IF NOT EXISTS RL_BOOKINGS_WRITER;
+CREATE ROLE IF NOT EXISTS RL_AFTERMARKET_WRITER;
+CREATE ROLE IF NOT EXISTS RL_UDS_WRITER;
+
+-- Cross-domain analytics role
+CREATE ROLE IF NOT EXISTS RL_ANALYTICS;
+
+-- Role hierarchy
+GRANT ROLE RL_ECOMM_READER TO ROLE RL_ANALYTICS;
+GRANT ROLE RL_BOOKINGS_READER TO ROLE RL_ANALYTICS;
+GRANT ROLE RL_AFTERMARKET_READER TO ROLE RL_ANALYTICS;
+GRANT ROLE RL_UDS_READER TO ROLE RL_ANALYTICS;
+GRANT ROLE RL_ANALYTICS TO ROLE SYSADMIN;
