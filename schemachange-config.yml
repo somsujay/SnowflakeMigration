@@ -1,4 +1,4 @@
-root-folder: migrations
+root-folder: banking
 modules-folder: null
 vars:
   database: "SSOM_COCO_DB"
