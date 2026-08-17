@@ -1,6 +1,6 @@
 /* ============================================================
    schemachange Migration: V1.1.0__bronze_tables.sql
-   PURPOSE : Bronze layer DDL - raw staging tables
+   PURPOSE : Bronze layer DDL - raw staging tables - Sujay Som
    ============================================================ */
 
 USE DATABASE {{ database }};

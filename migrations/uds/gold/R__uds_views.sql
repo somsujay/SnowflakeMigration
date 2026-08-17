@@ -1,0 +1,42 @@
+/* ============================================================
+   Domain   : uds
+   Layer    : gold
+   Purpose  : Repeatable - Customer 360 views and procedures
+   Author   : team-uds
+   ============================================================ */
+
+USE DATABASE {{ database }};
+USE SCHEMA GOLD;
+
+CREATE OR REPLACE VIEW V_UDS_CUSTOMER_360 AS
+SELECT
+    c.FULL_NAME,
+    c.PRIMARY_EMAIL,
+    c.COUNTRY,
+    c.CUSTOMER_SEGMENT,
+    f.SNAPSHOT_DATE,
+    f.ECOMM_ORDER_COUNT,
+    f.ECOMM_TOTAL_SPEND,
+    f.BOOKINGS_COUNT,
+    f.BOOKINGS_TOTAL_SPEND,
+    f.AM_SERVICE_COUNT,
+    f.AM_WARRANTY_CLAIMS,
+    f.TOTAL_LIFETIME_VALUE,
+    f.ENGAGEMENT_SCORE,
+    f.CHURN_RISK_SCORE
+FROM FACT_UDS_CUSTOMER_360 f
+JOIN {{ database }}.SILVER.DIM_UDS_MASTER_CUSTOMER c
+    ON f.MASTER_CUSTOMER_KEY = c.MASTER_CUSTOMER_KEY
+WHERE c.IS_ACTIVE = TRUE;
+
+CREATE OR REPLACE VIEW V_UDS_DOMAIN_HEALTH AS
+SELECT
+    METRIC_DATE,
+    DOMAIN,
+    ACTIVE_CUSTOMERS,
+    NEW_CUSTOMERS,
+    REVENUE,
+    TRANSACTION_COUNT,
+    AVG_TRANSACTION_VALUE
+FROM FACT_UDS_CROSS_DOMAIN_METRICS
+ORDER BY METRIC_DATE DESC, DOMAIN;
