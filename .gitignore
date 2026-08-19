@@ -7,10 +7,13 @@ streamlit_app/.streamlit/secrets.toml
 # Plans (auto-generated)
 plans/
 
-<<<<<<< HEAD
+# Cortex Code artifacts
+.cortex/
+
+# Presentation and HTML files
+*.pptx
+*.html
+
+# Runtime files
 .streamlit.log
 .streamlit.pid
-
-
-=======
->>>>>>> origin/main

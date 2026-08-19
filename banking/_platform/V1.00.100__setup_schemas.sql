@@ -1,21 +1,22 @@
 /* ============================================================
-   schemachange Migration: V1.0.0__setup_schemas.sql
-   PURPOSE : Create Medallion Architecture schemas
+   schemachange Migration: V1.000.100__setup_schemas.sql
+   PURPOSE : Create environment-specific schemas (RAW, CLEAN, CONFORMED, GOVERNANCE)
+             and shared METADATA schema.
    ============================================================ */
 
 USE DATABASE {{ database }};
 
-CREATE SCHEMA IF NOT EXISTS BRONZE
-COMMENT = 'Medallion Bronze layer: raw ingested staging data';
+CREATE SCHEMA IF NOT EXISTS {{ raw_schema }}
+COMMENT = 'Raw layer: raw ingested staging data ({{ environment }})';
 
-CREATE SCHEMA IF NOT EXISTS SILVER
-COMMENT = 'Medallion Silver layer: cleansed dimensions (SCD-1, SCD-2)';
+CREATE SCHEMA IF NOT EXISTS {{ clean_schema }}
+COMMENT = 'Clean layer: cleansed dimensions and transforms ({{ environment }})';
 
-CREATE SCHEMA IF NOT EXISTS GOLD
-COMMENT = 'Medallion Gold layer: business-ready fact tables and aggregates';
+CREATE SCHEMA IF NOT EXISTS {{ conformed_schema }}
+COMMENT = 'Conformed layer: business-ready fact tables and aggregates ({{ environment }})';
 
-CREATE SCHEMA IF NOT EXISTS GOVERNANCE
-COMMENT = 'Masking policies and data governance objects';
+CREATE SCHEMA IF NOT EXISTS {{ governance_schema }}
+COMMENT = 'Masking policies and data governance objects ({{ environment }})';
 
 CREATE SCHEMA IF NOT EXISTS METADATA
-COMMENT = 'Metadata and change tracking objects';
+COMMENT = 'Metadata and change tracking objects (shared across environments)';

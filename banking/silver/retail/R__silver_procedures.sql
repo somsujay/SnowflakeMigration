@@ -6,17 +6,17 @@
 
 USE DATABASE {{ database }};
 
-CREATE OR REPLACE PROCEDURE SILVER.Close_Current_DimCustomer_Record()
+CREATE OR REPLACE PROCEDURE {{ clean_schema }}.Close_Current_DimCustomer_Record()
 RETURNS STRING
 LANGUAGE SQL
 AS
 $$
 BEGIN
-    UPDATE SILVER.DimCustomer D
+    UPDATE {{ clean_schema }}.DimCustomer D
     SET
         D.End_Date     = CURRENT_DATE - 1,
         D.Current_Flag = 'N'
-    FROM BRONZE.T_Customer S
+    FROM {{ raw_schema }}.T_Customer S
     WHERE D.Customer_ID  = S.Customer_ID
       AND D.Current_Flag = 'Y'
       AND (
@@ -35,13 +35,13 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE SILVER.Insert_New_DimCustomer_Record()
+CREATE OR REPLACE PROCEDURE {{ clean_schema }}.Insert_New_DimCustomer_Record()
 RETURNS STRING
 LANGUAGE SQL
 AS
 $$
 BEGIN
-    INSERT INTO SILVER.DimCustomer
+    INSERT INTO {{ clean_schema }}.DimCustomer
     (
         Customer_ID, First_Name, Last_Name, Email_Address,
         City, State_Province, Country, Start_Date, End_Date, Current_Flag
@@ -52,8 +52,8 @@ BEGIN
         CURRENT_DATE            AS Start_Date,
         '9999-12-31'::DATE      AS End_Date,
         'Y'                     AS Current_Flag
-    FROM       BRONZE.T_Customer  S
-    LEFT JOIN  SILVER.DimCustomer D
+    FROM       {{ raw_schema }}.T_Customer  S
+    LEFT JOIN  {{ clean_schema }}.DimCustomer D
            ON  S.Customer_ID  = D.Customer_ID
           AND  D.Current_Flag = 'Y'
     WHERE
@@ -72,14 +72,14 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE SILVER.Load_DimAccount_SCD1()
+CREATE OR REPLACE PROCEDURE {{ clean_schema }}.Load_DimAccount_SCD1()
 RETURNS STRING
 LANGUAGE SQL
 AS
 $$
 BEGIN
-    MERGE INTO SILVER.DimAccount AS D
-    USING      BRONZE.T_Account  AS S
+    MERGE INTO {{ clean_schema }}.DimAccount AS D
+    USING      {{ raw_schema }}.T_Account  AS S
            ON  D.Account_ID = S.Account_ID
 
     WHEN MATCHED THEN
@@ -100,18 +100,18 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE SILVER.Load_DimTransactionType()
+CREATE OR REPLACE PROCEDURE {{ clean_schema }}.Load_DimTransactionType()
 RETURNS STRING
 LANGUAGE SQL
 AS
 $$
 BEGIN
-    MERGE INTO SILVER.DimTransactionType AS D
+    MERGE INTO {{ clean_schema }}.DimTransactionType AS D
     USING (
         SELECT DISTINCT
             Transaction_Type,
             Transaction_Type AS Description
-        FROM BRONZE.T_Transaction
+        FROM {{ raw_schema }}.T_Transaction
     ) AS S
     ON D.Transaction_Type = S.Transaction_Type
 
@@ -126,13 +126,13 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE SILVER.Populate_DimDate(StartDate DATE, EndDate DATE)
+CREATE OR REPLACE PROCEDURE {{ clean_schema }}.Populate_DimDate(StartDate DATE, EndDate DATE)
 RETURNS STRING
 LANGUAGE SQL
 AS
 $$
 BEGIN
-    INSERT INTO SILVER.DimDate (Date_Key, Year, Month, Day, Day_Of_Week)
+    INSERT INTO {{ clean_schema }}.DimDate (Date_Key, Year, Month, Day, Day_Of_Week)
     SELECT
         DATEADD(DAY, seq.seq_val, :StartDate)           AS Date_Key,
         YEAR(Date_Key)                                  AS Year,

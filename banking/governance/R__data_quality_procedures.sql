@@ -6,15 +6,15 @@
    ============================================================ */
 
 USE DATABASE {{ database }};
-USE SCHEMA GOVERNANCE;
+USE SCHEMA {{ governance_schema }};
 
-CREATE OR REPLACE PROCEDURE GOVERNANCE.Cleanse_Bronze_Data()
+CREATE OR REPLACE PROCEDURE {{ governance_schema }}.Cleanse_Bronze_Data()
 RETURNS STRING
 LANGUAGE SQL
 AS
 $$
 BEGIN
-    UPDATE BRONZE.T_Customer
+    UPDATE {{ raw_schema }}.T_Customer
     SET
         Customer_ID    = TRIM(Customer_ID),
         First_Name     = TRIM(First_Name),
@@ -34,7 +34,7 @@ BEGIN
      OR State_Province <> TRIM(State_Province)
      OR Country        <> TRIM(Country);
 
-    UPDATE BRONZE.T_Account
+    UPDATE {{ raw_schema }}.T_Account
     SET
         Account_ID    = TRIM(Account_ID),
         Customer_ID   = TRIM(Customer_ID),
@@ -49,7 +49,7 @@ BEGIN
      OR Currency_Code IS NULL
      OR Currency_Code <> TRIM(Currency_Code);
 
-    UPDATE BRONZE.T_Transaction
+    UPDATE {{ raw_schema }}.T_Transaction
     SET
         Transaction_ID   = TRIM(Transaction_ID),
         Account_ID       = TRIM(Account_ID),
@@ -61,30 +61,30 @@ BEGIN
      OR Transaction_Type <> TRIM(Transaction_Type)
      OR Description      <> TRIM(Description);
 
-    DELETE FROM BRONZE.T_Customer C
+    DELETE FROM {{ raw_schema }}.T_Customer C
     USING (
         SELECT Customer_ID, MAX(_LOADED_AT) AS max_loaded
-        FROM BRONZE.T_Customer
+        FROM {{ raw_schema }}.T_Customer
         GROUP BY Customer_ID
         HAVING COUNT(*) > 1
     ) D
     WHERE C.Customer_ID = D.Customer_ID
       AND C._LOADED_AT < D.max_loaded;
 
-    DELETE FROM BRONZE.T_Account A
+    DELETE FROM {{ raw_schema }}.T_Account A
     USING (
         SELECT Account_ID, MAX(_LOADED_AT) AS max_loaded
-        FROM BRONZE.T_Account
+        FROM {{ raw_schema }}.T_Account
         GROUP BY Account_ID
         HAVING COUNT(*) > 1
     ) D
     WHERE A.Account_ID = D.Account_ID
       AND A._LOADED_AT < D.max_loaded;
 
-    DELETE FROM BRONZE.T_Transaction T
+    DELETE FROM {{ raw_schema }}.T_Transaction T
     USING (
         SELECT Transaction_ID, MAX(_LOADED_AT) AS max_loaded
-        FROM BRONZE.T_Transaction
+        FROM {{ raw_schema }}.T_Transaction
         GROUP BY Transaction_ID
         HAVING COUNT(*) > 1
     ) D
@@ -98,7 +98,7 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE GOVERNANCE.Run_Data_Quality_Checks()
+CREATE OR REPLACE PROCEDURE {{ governance_schema }}.Run_Data_Quality_Checks()
 RETURNS STRING
 LANGUAGE SQL
 AS
@@ -110,77 +110,77 @@ BEGIN
     LET failed_count INTEGER := 0;
 
     SELECT COUNT(*) INTO :failed_count
-    FROM BRONZE.T_Customer WHERE Customer_ID IS NULL;
-    INSERT INTO GOVERNANCE.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
-    VALUES (:run_id, 'BRONZE.T_Customer', 'NULL_CHECK_Customer_ID', IFF(:failed_count > 0, 'ERROR', 'INFO'), :failed_count,
+    FROM {{ raw_schema }}.T_Customer WHERE Customer_ID IS NULL;
+    INSERT INTO {{ governance_schema }}.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
+    VALUES (:run_id, '{{ raw_schema }}.T_Customer', 'NULL_CHECK_Customer_ID', IFF(:failed_count > 0, 'ERROR', 'INFO'), :failed_count,
             IFF(:failed_count > 0, :failed_count || ' records with NULL Customer_ID', 'All records have Customer_ID'));
     total_checks := total_checks + 1;
     total_failures := total_failures + :failed_count;
 
     SELECT COUNT(*) INTO :failed_count
-    FROM BRONZE.T_Account WHERE Account_ID IS NULL;
-    INSERT INTO GOVERNANCE.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
-    VALUES (:run_id, 'BRONZE.T_Account', 'NULL_CHECK_Account_ID', IFF(:failed_count > 0, 'ERROR', 'INFO'), :failed_count,
+    FROM {{ raw_schema }}.T_Account WHERE Account_ID IS NULL;
+    INSERT INTO {{ governance_schema }}.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
+    VALUES (:run_id, '{{ raw_schema }}.T_Account', 'NULL_CHECK_Account_ID', IFF(:failed_count > 0, 'ERROR', 'INFO'), :failed_count,
             IFF(:failed_count > 0, :failed_count || ' records with NULL Account_ID', 'All records have Account_ID'));
     total_checks := total_checks + 1;
     total_failures := total_failures + :failed_count;
 
     SELECT COUNT(*) INTO :failed_count
-    FROM BRONZE.T_Transaction WHERE Transaction_ID IS NULL;
-    INSERT INTO GOVERNANCE.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
-    VALUES (:run_id, 'BRONZE.T_Transaction', 'NULL_CHECK_Transaction_ID', IFF(:failed_count > 0, 'ERROR', 'INFO'), :failed_count,
+    FROM {{ raw_schema }}.T_Transaction WHERE Transaction_ID IS NULL;
+    INSERT INTO {{ governance_schema }}.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
+    VALUES (:run_id, '{{ raw_schema }}.T_Transaction', 'NULL_CHECK_Transaction_ID', IFF(:failed_count > 0, 'ERROR', 'INFO'), :failed_count,
             IFF(:failed_count > 0, :failed_count || ' records with NULL Transaction_ID', 'All records have Transaction_ID'));
     total_checks := total_checks + 1;
     total_failures := total_failures + :failed_count;
 
     SELECT COUNT(*) INTO :failed_count FROM (
-        SELECT Customer_ID FROM BRONZE.T_Customer GROUP BY Customer_ID HAVING COUNT(*) > 1
+        SELECT Customer_ID FROM {{ raw_schema }}.T_Customer GROUP BY Customer_ID HAVING COUNT(*) > 1
     );
-    INSERT INTO GOVERNANCE.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
-    VALUES (:run_id, 'BRONZE.T_Customer', 'DUPLICATE_PK', IFF(:failed_count > 0, 'WARNING', 'INFO'), :failed_count,
+    INSERT INTO {{ governance_schema }}.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
+    VALUES (:run_id, '{{ raw_schema }}.T_Customer', 'DUPLICATE_PK', IFF(:failed_count > 0, 'WARNING', 'INFO'), :failed_count,
             IFF(:failed_count > 0, :failed_count || ' duplicate Customer_IDs found', 'No duplicate Customer_IDs'));
     total_checks := total_checks + 1;
     total_failures := total_failures + :failed_count;
 
     SELECT COUNT(*) INTO :failed_count
-    FROM BRONZE.T_Customer
+    FROM {{ raw_schema }}.T_Customer
     WHERE Email_Address IS NOT NULL
       AND NOT RLIKE(Email_Address, '^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}$');
-    INSERT INTO GOVERNANCE.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
-    VALUES (:run_id, 'BRONZE.T_Customer', 'EMAIL_FORMAT', IFF(:failed_count > 0, 'WARNING', 'INFO'), :failed_count,
+    INSERT INTO {{ governance_schema }}.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
+    VALUES (:run_id, '{{ raw_schema }}.T_Customer', 'EMAIL_FORMAT', IFF(:failed_count > 0, 'WARNING', 'INFO'), :failed_count,
             IFF(:failed_count > 0, :failed_count || ' records with invalid email format', 'All email addresses are valid'));
     total_checks := total_checks + 1;
     total_failures := total_failures + :failed_count;
 
     SELECT COUNT(*) INTO :failed_count
-    FROM BRONZE.T_Account A
-    LEFT JOIN BRONZE.T_Customer C ON A.Customer_ID = C.Customer_ID
+    FROM {{ raw_schema }}.T_Account A
+    LEFT JOIN {{ raw_schema }}.T_Customer C ON A.Customer_ID = C.Customer_ID
     WHERE C.Customer_ID IS NULL;
-    INSERT INTO GOVERNANCE.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
-    VALUES (:run_id, 'BRONZE.T_Account', 'FK_CUSTOMER_REF', IFF(:failed_count > 0, 'ERROR', 'INFO'), :failed_count,
+    INSERT INTO {{ governance_schema }}.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
+    VALUES (:run_id, '{{ raw_schema }}.T_Account', 'FK_CUSTOMER_REF', IFF(:failed_count > 0, 'ERROR', 'INFO'), :failed_count,
             IFF(:failed_count > 0, :failed_count || ' accounts reference non-existent customers', 'All accounts reference valid customers'));
     total_checks := total_checks + 1;
     total_failures := total_failures + :failed_count;
 
     SELECT COUNT(*) INTO :failed_count
-    FROM BRONZE.T_Transaction T
-    LEFT JOIN BRONZE.T_Account A ON T.Account_ID = A.Account_ID
+    FROM {{ raw_schema }}.T_Transaction T
+    LEFT JOIN {{ raw_schema }}.T_Account A ON T.Account_ID = A.Account_ID
     WHERE A.Account_ID IS NULL;
-    INSERT INTO GOVERNANCE.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
-    VALUES (:run_id, 'BRONZE.T_Transaction', 'FK_ACCOUNT_REF', IFF(:failed_count > 0, 'ERROR', 'INFO'), :failed_count,
+    INSERT INTO {{ governance_schema }}.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
+    VALUES (:run_id, '{{ raw_schema }}.T_Transaction', 'FK_ACCOUNT_REF', IFF(:failed_count > 0, 'ERROR', 'INFO'), :failed_count,
             IFF(:failed_count > 0, :failed_count || ' transactions reference non-existent accounts', 'All transactions reference valid accounts'));
     total_checks := total_checks + 1;
     total_failures := total_failures + :failed_count;
 
     SELECT COUNT(*) INTO :failed_count FROM (
         SELECT Customer_ID
-        FROM SILVER.DimCustomer
+        FROM {{ clean_schema }}.DimCustomer
         WHERE Current_Flag = 'Y'
         GROUP BY Customer_ID
         HAVING COUNT(*) > 1
     );
-    INSERT INTO GOVERNANCE.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
-    VALUES (:run_id, 'SILVER.DimCustomer', 'SCD2_SINGLE_ACTIVE', IFF(:failed_count > 0, 'ERROR', 'INFO'), :failed_count,
+    INSERT INTO {{ governance_schema }}.DATA_QUALITY_LOG (run_id, table_name, check_name, severity, records_failed, details)
+    VALUES (:run_id, '{{ clean_schema }}.DimCustomer', 'SCD2_SINGLE_ACTIVE', IFF(:failed_count > 0, 'ERROR', 'INFO'), :failed_count,
             IFF(:failed_count > 0, :failed_count || ' customers with multiple active records', 'SCD-2 integrity OK'));
     total_checks := total_checks + 1;
     total_failures := total_failures + :failed_count;

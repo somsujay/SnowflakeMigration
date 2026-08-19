@@ -1,12 +1,17 @@
-root-folder: migrations
+root-folder: banking
 modules-folder: null
 vars:
-  database: "SSOM_COCO_DB"
+  database: "FINANCE_CORE_DEV"
   warehouse: "COMPUTE_WH"
   role: "SYSADMIN"
   environment: "dev"
+  schema_suffix: "_DEV"
+  raw_schema: "RAW_DEV"
+  clean_schema: "CLEAN_DEV"
+  conformed_schema: "CONFORMED_DEV"
+  governance_schema: "GOVERNANCE_DEV"
 
 create-change-history-table: true
-change-history-table: "SSOM_COCO_DB.METADATA.SCHEMACHANGE_HISTORY"
+change-history-table: "FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY"
 autocommit: true
 dry-run: false
