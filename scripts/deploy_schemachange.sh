@@ -108,7 +108,7 @@ SCHEMACHANGE_ARGS=(
     --snowflake-role "${SNOWFLAKE_ROLE}"
     --snowflake-warehouse "${SNOWFLAKE_WAREHOUSE}"
     --snowflake-database "${DB}"
-    --change-history-table "${DB}.METADATA.SCHEMACHANGE_HISTORY"
+    --change-history-table "${DB}.METADATA.SCHEMACHANGE_HISTORY_${ENV^^}"
     --vars "${VARS_JSON}"
     --create-change-history-table
     --autocommit
