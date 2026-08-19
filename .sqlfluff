@@ -18,10 +18,15 @@ extended_capitalisation_policy = upper
 extended_capitalisation_policy = upper
 
 [sqlfluff:templater:jinja:context]
-database = "SSOM_COCO_DB"
+database = "FINANCE_CORE_DEV"
 warehouse = "COMPUTE_WH"
 role = "SYSADMIN"
 environment = "dev"
+schema_suffix = "_DEV"
+raw_schema = "RAW_DEV"
+clean_schema = "CLEAN_DEV"
+conformed_schema = "CONFORMED_DEV"
+governance_schema = "GOVERNANCE_DEV"
 
 [sqlfluff:paths]
 ignore = Teradata_Scripts
