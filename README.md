@@ -227,7 +227,7 @@ Both options load into the same Bronze tables. Downstream ETL (Silver/Gold), dat
 | Account | `KXAXARZ-GW22129` |
 | Connection | `MY_TRIAL_ACCOUNT` |
 | Warehouse | `COMPUTE_WH` |
-| Schemas | `BRONZE`, `SILVER`, `GOLD`, `GOVERNANCE`, `METADATA` |
+| Schemas | `RAW_<ENV>`, `CLEAN_<ENV>`, `CONFORMED_<ENV>`, `GOVERNANCE_<ENV>`, `METADATA` |
 
 ## Sample Data
 

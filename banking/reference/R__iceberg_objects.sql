@@ -4,11 +4,11 @@
    ============================================================ */
 
 USE DATABASE {{ database }};
-USE SCHEMA BRONZE;
+USE SCHEMA {{ raw_schema }};
 
-CREATE OR REPLACE FILE FORMAT BRONZE.PARQUET_FORMAT
+CREATE OR REPLACE FILE FORMAT {{ raw_schema }}.PARQUET_FORMAT
 TYPE = PARQUET;
 
-CREATE OR REPLACE STAGE BRONZE.ICEBERG_STAGE
-    FILE_FORMAT = BRONZE.PARQUET_FORMAT
+CREATE OR REPLACE STAGE {{ raw_schema }}.ICEBERG_STAGE
+    FILE_FORMAT = {{ raw_schema }}.PARQUET_FORMAT
     COMMENT = 'Named stage for Parquet/Iceberg data ingestion';

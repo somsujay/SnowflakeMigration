@@ -6,13 +6,13 @@
 
 USE DATABASE {{ database }};
 
-CREATE OR REPLACE PROCEDURE GOLD.Load_FactDailyTransaction(p_ReportDate DATE)
+CREATE OR REPLACE PROCEDURE {{ conformed_schema }}.Load_FactDailyTransaction(p_ReportDate DATE)
 RETURNS STRING
 LANGUAGE SQL
 AS
 $$
 BEGIN
-    INSERT INTO GOLD.FactDailyTransaction
+    INSERT INTO {{ conformed_schema }}.FactDailyTransaction
     (
         Date_Key, Customer_ID, Account_ID, Transaction_ID, Transaction_Type, Amount
     )
@@ -23,11 +23,11 @@ BEGIN
         t.Transaction_ID,
         t.Transaction_Type,
         t.Amount
-    FROM       BRONZE.T_Transaction  t
-    JOIN       BRONZE.T_Account      a
+    FROM       {{ raw_schema }}.T_Transaction  t
+    JOIN       {{ raw_schema }}.T_Account      a
            ON t.Account_ID = a.Account_ID
     WHERE  (:p_ReportDate IS NULL OR t.Transaction_Date::DATE = :p_ReportDate)
-      AND  t.Transaction_Date::DATE NOT IN (SELECT DISTINCT Date_Key FROM GOLD.FactDailyTransaction);
+      AND  t.Transaction_Date::DATE NOT IN (SELECT DISTINCT Date_Key FROM {{ conformed_schema }}.FactDailyTransaction);
 
     RETURN 'Load_FactDailyTransaction completed for ' || COALESCE(TO_VARCHAR(:p_ReportDate), 'ALL dates');
 EXCEPTION
@@ -36,19 +36,19 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE GOLD.Load_FactDailyAgg(p_ReportDate DATE)
+CREATE OR REPLACE PROCEDURE {{ conformed_schema }}.Load_FactDailyAgg(p_ReportDate DATE)
 RETURNS STRING
 LANGUAGE SQL
 AS
 $$
 BEGIN
     IF (:p_ReportDate IS NULL) THEN
-        TRUNCATE TABLE GOLD.FactDailyAgg;
+        TRUNCATE TABLE {{ conformed_schema }}.FactDailyAgg;
     ELSE
-        DELETE FROM GOLD.FactDailyAgg WHERE Date_Key = :p_ReportDate;
+        DELETE FROM {{ conformed_schema }}.FactDailyAgg WHERE Date_Key = :p_ReportDate;
     END IF;
 
-    INSERT INTO GOLD.FactDailyAgg
+    INSERT INTO {{ conformed_schema }}.FactDailyAgg
     SELECT
         t.Transaction_Date::DATE AS Date_Key,
         a.Customer_ID,
@@ -56,13 +56,13 @@ BEGIN
         NULL                    AS Transaction_Type,
         SUM(t.Amount)           AS Total_Amount,
         COUNT(*)                AS Transaction_Count
-    FROM       BRONZE.T_Transaction  t
-    JOIN       BRONZE.T_Account      a
+    FROM       {{ raw_schema }}.T_Transaction  t
+    JOIN       {{ raw_schema }}.T_Account      a
            ON t.Account_ID = a.Account_ID
     WHERE  (:p_ReportDate IS NULL OR t.Transaction_Date::DATE = :p_ReportDate)
     GROUP BY 1, 2;
 
-    INSERT INTO GOLD.FactDailyAgg
+    INSERT INTO {{ conformed_schema }}.FactDailyAgg
     SELECT
         t.Transaction_Date::DATE AS Date_Key,
         NULL                    AS Customer_ID,
@@ -70,11 +70,11 @@ BEGIN
         NULL                    AS Transaction_Type,
         SUM(t.Amount)           AS Total_Amount,
         COUNT(*)                AS Transaction_Count
-    FROM   BRONZE.T_Transaction  t
+    FROM   {{ raw_schema }}.T_Transaction  t
     WHERE  (:p_ReportDate IS NULL OR t.Transaction_Date::DATE = :p_ReportDate)
     GROUP BY 1, 3;
 
-    INSERT INTO GOLD.FactDailyAgg
+    INSERT INTO {{ conformed_schema }}.FactDailyAgg
     SELECT
         t.Transaction_Date::DATE AS Date_Key,
         a.Customer_ID,
@@ -82,13 +82,13 @@ BEGIN
         t.Transaction_Type,
         SUM(t.Amount)           AS Total_Amount,
         COUNT(*)                AS Transaction_Count
-    FROM       BRONZE.T_Transaction  t
-    JOIN       BRONZE.T_Account      a
+    FROM       {{ raw_schema }}.T_Transaction  t
+    JOIN       {{ raw_schema }}.T_Account      a
            ON t.Account_ID = a.Account_ID
     WHERE  (:p_ReportDate IS NULL OR t.Transaction_Date::DATE = :p_ReportDate)
     GROUP BY 1, 2, 4;
 
-    INSERT INTO GOLD.FactDailyAgg
+    INSERT INTO {{ conformed_schema }}.FactDailyAgg
     SELECT
         t.Transaction_Date::DATE AS Date_Key,
         NULL                    AS Customer_ID,
@@ -96,7 +96,7 @@ BEGIN
         t.Transaction_Type,
         SUM(t.Amount)           AS Total_Amount,
         COUNT(*)                AS Transaction_Count
-    FROM   BRONZE.T_Transaction  t
+    FROM   {{ raw_schema }}.T_Transaction  t
     WHERE  (:p_ReportDate IS NULL OR t.Transaction_Date::DATE = :p_ReportDate)
     GROUP BY 1, 3, 4;
 
@@ -107,7 +107,7 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE GOLD.Daily_ETL_Run()
+CREATE OR REPLACE PROCEDURE {{ conformed_schema }}.Daily_ETL_Run()
 RETURNS STRING
 LANGUAGE SQL
 AS
@@ -116,28 +116,28 @@ BEGIN
     LET current_step STRING := '';
 
     current_step := 'Cleanse_Bronze_Data';
-    CALL GOVERNANCE.Cleanse_Bronze_Data();
+    CALL {{ governance_schema }}.Cleanse_Bronze_Data();
 
     current_step := 'Close_Current_DimCustomer_Record';
-    CALL SILVER.Close_Current_DimCustomer_Record();
+    CALL {{ clean_schema }}.Close_Current_DimCustomer_Record();
 
     current_step := 'Insert_New_DimCustomer_Record';
-    CALL SILVER.Insert_New_DimCustomer_Record();
+    CALL {{ clean_schema }}.Insert_New_DimCustomer_Record();
 
     current_step := 'Load_DimAccount_SCD1';
-    CALL SILVER.Load_DimAccount_SCD1();
+    CALL {{ clean_schema }}.Load_DimAccount_SCD1();
 
     current_step := 'Load_DimTransactionType';
-    CALL SILVER.Load_DimTransactionType();
+    CALL {{ clean_schema }}.Load_DimTransactionType();
 
     current_step := 'Load_FactDailyTransaction';
-    CALL GOLD.Load_FactDailyTransaction(NULL);
+    CALL {{ conformed_schema }}.Load_FactDailyTransaction(NULL);
 
     current_step := 'Load_FactDailyAgg';
-    CALL GOLD.Load_FactDailyAgg(NULL);
+    CALL {{ conformed_schema }}.Load_FactDailyAgg(NULL);
 
     current_step := 'Run_Data_Quality_Checks';
-    CALL GOVERNANCE.Run_Data_Quality_Checks();
+    CALL {{ governance_schema }}.Run_Data_Quality_Checks();
 
     RETURN 'Daily ETL completed successfully at ' || CURRENT_TIMESTAMP();
 EXCEPTION
@@ -146,7 +146,7 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE GOLD.Daily_ETL_Run_2()
+CREATE OR REPLACE PROCEDURE {{ conformed_schema }}.Daily_ETL_Run_2()
 RETURNS STRING
 LANGUAGE SQL
 AS
@@ -155,28 +155,28 @@ BEGIN
     LET current_step STRING := '';
 
     current_step := 'Cleanse_Bronze_Data';
-    CALL GOVERNANCE.Cleanse_Bronze_Data();
+    CALL {{ governance_schema }}.Cleanse_Bronze_Data();
 
     current_step := 'Close_Current_DimCustomer_Record';
-    CALL SILVER.Close_Current_DimCustomer_Record();
+    CALL {{ clean_schema }}.Close_Current_DimCustomer_Record();
 
     current_step := 'Insert_New_DimCustomer_Record';
-    CALL SILVER.Insert_New_DimCustomer_Record();
+    CALL {{ clean_schema }}.Insert_New_DimCustomer_Record();
 
     current_step := 'Load_DimAccount_SCD1';
-    CALL SILVER.Load_DimAccount_SCD1();
+    CALL {{ clean_schema }}.Load_DimAccount_SCD1();
 
     current_step := 'Load_DimTransactionType';
-    CALL SILVER.Load_DimTransactionType();
+    CALL {{ clean_schema }}.Load_DimTransactionType();
 
     current_step := 'Load_FactDailyTransaction';
-    CALL GOLD.Load_FactDailyTransaction(NULL);
+    CALL {{ conformed_schema }}.Load_FactDailyTransaction(NULL);
 
     current_step := 'Load_FactDailyAgg';
-    CALL GOLD.Load_FactDailyAgg(NULL);
+    CALL {{ conformed_schema }}.Load_FactDailyAgg(NULL);
 
     current_step := 'Run_Data_Quality_Checks';
-    CALL GOVERNANCE.Run_Data_Quality_Checks();
+    CALL {{ governance_schema }}.Run_Data_Quality_Checks();
 
     RETURN 'Daily ETL completed successfully at ' || CURRENT_TIMESTAMP();
 EXCEPTION

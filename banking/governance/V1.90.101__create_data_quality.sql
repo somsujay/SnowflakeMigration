@@ -5,9 +5,9 @@
    ============================================================ */
 
 USE DATABASE {{ database }};
-USE SCHEMA GOVERNANCE;
+USE SCHEMA {{ governance_schema }};
 
-CREATE TABLE IF NOT EXISTS GOVERNANCE.DATA_QUALITY_LOG (
+CREATE TABLE IF NOT EXISTS {{ governance_schema }}.DATA_QUALITY_LOG (
     LOG_ID INTEGER AUTOINCREMENT,
     RUN_ID VARCHAR(50) NOT NULL,
     CHECK_TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),

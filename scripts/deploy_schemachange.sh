@@ -49,11 +49,19 @@ parse_env_value() {
 DB=$(parse_env_value "database")
 WH=$(parse_env_value "warehouse")
 CONN=$(parse_env_value "connection")
+SUFFIX=$(parse_env_value "schema_suffix")
 
-if [[ -z "$DB" || -z "$WH" || -z "$CONN" ]]; then
+if [[ -z "$DB" || -z "$WH" || -z "$CONN" || -z "$SUFFIX" ]]; then
     echo "ERROR: Could not parse environment '${ENV}' from ${ENV_FILE}"
+    echo "Required fields: database, warehouse, connection, schema_suffix"
     exit 1
 fi
+
+# Build composite schema names
+RAW_SCHEMA="RAW${SUFFIX}"
+CLEAN_SCHEMA="CLEAN${SUFFIX}"
+CONFORMED_SCHEMA="CONFORMED${SUFFIX}"
+GOVERNANCE_SCHEMA="GOVERNANCE${SUFFIX}"
 
 # --- Resolve Snowflake credentials ---
 SNOWFLAKE_ACCOUNT="${SNOWFLAKE_ACCOUNT:-}"
@@ -82,6 +90,7 @@ echo "============================================================"
 echo ""
 echo "Environment:  ${ENV}"
 echo "Database:     ${DB}"
+echo "Schemas:      ${RAW_SCHEMA}, ${CLEAN_SCHEMA}, ${CONFORMED_SCHEMA}, ${GOVERNANCE_SCHEMA}"
 echo "Warehouse:    ${WH}"
 echo "Role:         ${SNOWFLAKE_ROLE}"
 echo "Key file:     ${SNOWFLAKE_PRIVATE_KEY_PATH}"
@@ -89,7 +98,7 @@ echo "Dry-run:      ${DRY_RUN}"
 echo ""
 
 # --- Build schemachange command ---
-VARS_JSON="{\"database\": \"${DB}\", \"warehouse\": \"${WH}\", \"role\": \"${SNOWFLAKE_ROLE}\", \"environment\": \"${ENV}\"}"
+VARS_JSON="{\"database\": \"${DB}\", \"warehouse\": \"${WH}\", \"role\": \"${SNOWFLAKE_ROLE}\", \"environment\": \"${ENV}\", \"schema_suffix\": \"${SUFFIX}\", \"raw_schema\": \"${RAW_SCHEMA}\", \"clean_schema\": \"${CLEAN_SCHEMA}\", \"conformed_schema\": \"${CONFORMED_SCHEMA}\", \"governance_schema\": \"${GOVERNANCE_SCHEMA}\"}"
 
 SCHEMACHANGE_ARGS=(
     deploy
