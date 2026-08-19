@@ -87,6 +87,10 @@ parse_env_value() {
 DB=$(parse_env_value "database")
 WH=$(parse_env_value "warehouse")
 CONN=$(parse_env_value "connection")
+RAW_SCHEMA=$(parse_env_value "raw_schema")
+CLEAN_SCHEMA=$(parse_env_value "clean_schema")
+CONFORMED_SCHEMA=$(parse_env_value "conformed_schema")
+GOVERNANCE_SCHEMA=$(parse_env_value "governance_schema")
 
 if [[ -z "$DB" || -z "$WH" || -z "$CONN" ]]; then
     echo "ERROR: Could not parse environment '${ENV}' from ${ENV_FILE}"
@@ -104,8 +108,13 @@ echo ">> Substituting {{DATABASE_NAME}} with ${DB}..."
 echo ">> Executing smoke tests..."
 echo ""
 
-# Substitute placeholder and run
-sed "s/{{DATABASE_NAME}}/${DB}/g" "$TEST_FILE" | \
+# Substitute placeholders and run
+sed -e "s/{{DATABASE_NAME}}/${DB}/g" \
+    -e "s/{{RAW_SCHEMA}}/${RAW_SCHEMA}/g" \
+    -e "s/{{CLEAN_SCHEMA}}/${CLEAN_SCHEMA}/g" \
+    -e "s/{{CONFORMED_SCHEMA}}/${CONFORMED_SCHEMA}/g" \
+    -e "s/{{GOVERNANCE_SCHEMA}}/${GOVERNANCE_SCHEMA}/g" \
+    "$TEST_FILE" | \
     snow sql -c "$CONN" --database "$DB" --warehouse "$WH" -i
 
 EXIT_CODE=$?

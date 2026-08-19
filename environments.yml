@@ -9,23 +9,39 @@
 dev:
   database: FINANCE_CORE_DEV
   schema_suffix: _DEV
+  raw_schema: RAW_DEV
+  clean_schema: CLEAN_DEV
+  conformed_schema: CONFORMED_DEV
+  governance_schema: GOVERNANCE_DEV
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
 
 qa:
   database: FINANCE_CORE_DEV
   schema_suffix: _QA
+  raw_schema: RAW_QA
+  clean_schema: CLEAN_QA
+  conformed_schema: CONFORMED_QA
+  governance_schema: GOVERNANCE_QA
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
 
 preprod:
   database: FINANCE_CORE_DEV
   schema_suffix: _PREPROD
+  raw_schema: RAW_PREPROD
+  clean_schema: CLEAN_PREPROD
+  conformed_schema: CONFORMED_PREPROD
+  governance_schema: GOVERNANCE_PREPROD
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
 
 prod:
   database: FINANCE_CORE_PROD
   schema_suffix: _PROD
+  raw_schema: RAW_PROD
+  clean_schema: CLEAN_PROD
+  conformed_schema: CONFORMED_PROD
+  governance_schema: GOVERNANCE_PROD
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
