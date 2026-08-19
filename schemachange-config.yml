@@ -12,6 +12,6 @@ vars:
   governance_schema: "GOVERNANCE_DEV"
 
 create-change-history-table: true
-change-history-table: "FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY"
+change-history-table: "FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY_DEV"
 autocommit: true
 dry-run: false
