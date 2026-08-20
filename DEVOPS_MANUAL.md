@@ -19,8 +19,13 @@
 │                       Snowflake (KXAXARZ-GW22129)                             │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  SSOM_COCO_DB    SSOM_COCO_DB_QA   SSOM_COCO_DB_PREPROD   SSOM_COCO_DB_PROD │
-│     (DEV)             (QA)              (PREPROD)              (PROD)         │
+│  FINANCE_CORE_DEV (all non-prod envs share one DB, schema-isolated)          │
+│    ├── RAW_DEV / CLEAN_DEV / CONFORMED_DEV / GOVERNANCE_DEV                  │
+│    ├── RAW_QA  / CLEAN_QA  / CONFORMED_QA  / GOVERNANCE_QA                   │
+│    └── RAW_PREPROD / CLEAN_PREPROD / CONFORMED_PREPROD / GOVERNANCE_PREPROD   │
+│                                                                              │
+│  FINANCE_CORE_PROD (production)                                              │
+│    └── RAW_PROD / CLEAN_PROD / CONFORMED_PROD / GOVERNANCE_PROD              │
 │                                                                              │
 │  Warehouse: COMPUTE_WH (shared, XS)                                         │
 │                                                                              │
@@ -36,28 +41,28 @@ The SQL codebase uses **schemachange** for migration management, organized under
 ```
 banking/
 ├── _platform/
-│   └── V1.0.0__setup_schemas.sql         # Schema creation (BRONZE, SILVER, GOLD, etc.)
-├── bronze/retail/
-│   └── V1.1.0__bronze_tables.sql         # Bronze tables, stages, streams, tasks
-├── silver/retail/
-│   ├── V1.2.0__silver_tables.sql         # Silver dimension tables
-│   └── R__silver_procedures.sql          # Repeatable: Silver ETL procedures (SCD-2, SCD-1)
-├── gold/retail/
-│   ├── V1.3.0__gold_tables.sql           # Gold fact tables
-│   ├── R__gold_procedures.sql            # Repeatable: Gold ETL procedures
-│   └── R__gold_views.sql                 # Repeatable: Gold views (re-run every deploy)
+│   └── V1.000.100__setup_schemas.sql           # Schema creation (RAW, CLEAN, CONFORMED, GOVERNANCE)
+├── raw/retail/
+│   └── V1.050.100__create_raw_tables.sql       # Raw staging tables (T_CUSTOMER, T_ACCOUNT, T_TRANSACTION)
+├── clean/retail/
+│   ├── V1.050.200__create_clean_tables.sql     # Clean dimension tables (DIMCUSTOMER, DIMACCOUNT, etc.)
+│   └── R__retail_clean_procedures.sql          # Repeatable: Clean ETL procedures (SCD-2, SCD-1)
+├── conformed/retail/
+│   ├── V1.050.300__create_conformed_tables.sql # Conformed fact tables (FACTDAILYTRANSACTION, FACTDAILYAGG)
+│   ├── R__retail_procedures.sql                # Repeatable: Conformed ETL procedures
+│   └── R__retail_views.sql                     # Repeatable: Conformed views (re-run every deploy)
 ├── orchestration/
-│   ├── R__orchestration.sql              # Repeatable: Daily_ETL_Run() orchestrator
-│   └── R__ingestion_tasks.sql            # Repeatable: Ingestion task definitions
+│   ├── R__orchestration.sql                    # Repeatable: Daily_ETL_Run() orchestrator
+│   └── R__ingestion_tasks.sql                  # Repeatable: Ingestion task definitions
 ├── reference/
-│   ├── R__seed_data.sql                  # Repeatable: Seed/reference data
-│   └── R__iceberg_objects.sql            # Repeatable: Iceberg/Parquet ingestion objects
+│   ├── R__seed_data.sql                        # Repeatable: Seed/reference data
+│   └── R__iceberg_objects.sql                  # Repeatable: Iceberg/Parquet ingestion objects
 └── governance/
-    ├── V1.4.0__masking_policies.sql      # Masking policy table/setup
-    ├── V1.5.0__data_quality.sql          # DATA_QUALITY_LOG table creation
-    ├── R__masking_policies.sql           # Repeatable: Masking policy definitions & assignments
-    ├── R__data_quality_procedures.sql    # Repeatable: Data quality procedures
-    └── A__grants.sql                     # Always-run: grants (re-applied every deploy)
+    ├── V1.900.100__create_masking_policies.sql # Masking policy table/setup
+    ├── V1.900.101__create_data_quality.sql     # DATA_QUALITY_LOG table creation
+    ├── R__masking_policies.sql                 # Repeatable: Masking policy definitions & assignments
+    ├── R__data_quality_procedures.sql          # Repeatable: Data quality procedures
+    └── A__grants.sql                           # Always-run: grants (re-applied every deploy)
 ```
 
 ### 2.1 Schemachange Naming Conventions
@@ -76,23 +81,28 @@ File: `schemachange-config.yml`
 root-folder: banking
 modules-folder: null
 vars:
-  database: "SSOM_COCO_DB"
+  database: "FINANCE_CORE_DEV"
   warehouse: "COMPUTE_WH"
   role: "SYSADMIN"
   environment: "dev"
+  schema_suffix: "_DEV"
+  raw_schema: "RAW_DEV"
+  clean_schema: "CLEAN_DEV"
+  conformed_schema: "CONFORMED_DEV"
+  governance_schema: "GOVERNANCE_DEV"
 
 create-change-history-table: true
-change-history-table: "{{database}}.METADATA.SCHEMACHANGE_HISTORY"
+change-history-table: "FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY_DEV"
 autocommit: true
 dry-run: false
 ```
 
 ### 2.3 Change History
 
-Schemachange tracks all applied migrations in `<database>.METADATA.SCHEMACHANGE_HISTORY`. Query it to see deployment state:
+Schemachange tracks all applied migrations in `<database>.METADATA.SCHEMACHANGE_HISTORY_<ENV>`. Query it to see deployment state:
 
 ```sql
-SELECT * FROM SSOM_COCO_DB.METADATA.SCHEMACHANGE_HISTORY ORDER BY INSTALLED_ON DESC;
+SELECT * FROM FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY_DEV ORDER BY INSTALLED_ON DESC;
 ```
 
 ---
@@ -325,7 +335,9 @@ gh workflow run deploy-prod.yml -f action=deploy
 touch banking/<layer>/<domain>/V1.11.0__add_new_table.sql
 
 # 2. Write your SQL (use Jinja vars for database targeting)
-#    Available vars: {{database}}, {{warehouse}}, {{role}}, {{environment}}
+#    Available vars: {{database}}, {{warehouse}}, {{role}}, {{environment}},
+#                    {{schema_suffix}}, {{raw_schema}}, {{clean_schema}},
+#                    {{conformed_schema}}, {{governance_schema}}
 
 # 3. Test locally with dry-run
 bash scripts/deploy_schemachange.sh --env=dev --dry-run
@@ -397,22 +409,42 @@ Since schemachange tracks applied versions, rolling back requires one of:
 
 ```yaml
 dev:
-  database: SSOM_COCO_DB
+  database: FINANCE_CORE_DEV
+  schema_suffix: _DEV
+  raw_schema: RAW_DEV
+  clean_schema: CLEAN_DEV
+  conformed_schema: CONFORMED_DEV
+  governance_schema: GOVERNANCE_DEV
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
 
 qa:
-  database: SSOM_COCO_DB_QA
+  database: FINANCE_CORE_DEV
+  schema_suffix: _QA
+  raw_schema: RAW_QA
+  clean_schema: CLEAN_QA
+  conformed_schema: CONFORMED_QA
+  governance_schema: GOVERNANCE_QA
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
 
 preprod:
-  database: SSOM_COCO_DB_PREPROD
+  database: FINANCE_CORE_DEV
+  schema_suffix: _PREPROD
+  raw_schema: RAW_PREPROD
+  clean_schema: CLEAN_PREPROD
+  conformed_schema: CONFORMED_PREPROD
+  governance_schema: GOVERNANCE_PREPROD
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
 
 prod:
-  database: SSOM_COCO_DB_PROD
+  database: FINANCE_CORE_PROD
+  schema_suffix: _PROD
+  raw_schema: RAW_PROD
+  clean_schema: CLEAN_PROD
+  conformed_schema: CONFORMED_PROD
+  governance_schema: GOVERNANCE_PROD
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
 ```
@@ -432,9 +464,10 @@ Scripts accept runtime overrides:
 ### 7.3 Provisioning a New Environment
 
 ```sql
--- 1. Create database
-CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_<ENV>;
-GRANT OWNERSHIP ON DATABASE SSOM_COCO_DB_<ENV> TO ROLE ACCOUNTADMIN;
+-- Non-prod environments share FINANCE_CORE_DEV with schema isolation.
+-- Only prod needs a separate database:
+CREATE DATABASE IF NOT EXISTS FINANCE_CORE_PROD;
+GRANT OWNERSHIP ON DATABASE FINANCE_CORE_PROD TO ROLE ACCOUNTADMIN;
 
 -- 2. Grant warehouse usage
 GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE ACCOUNTADMIN;
@@ -458,7 +491,7 @@ After every deployment, the pipeline validates:
 
 | Check | Test File | Validates |
 |-------|-----------|-----------|
-| Schema existence | `tests/smoke_test.sql` | BRONZE, SILVER, GOLD, GOVERNANCE schemas |
+| Schema existence | `tests/smoke_test.sql` | RAW, CLEAN, CONFORMED, GOVERNANCE schemas |
 | Object existence | `tests/smoke_test.sql` | All tables, views, stages, tasks |
 | Object counts | `tests/integration_test.sql` | Minimum expected objects per schema |
 | Procedure availability | `tests/integration_test.sql` | All ETL procedures callable |
@@ -475,7 +508,7 @@ After every deployment, the pipeline validates:
 ```bash
 snow sql -c MY_TRIAL_ACCOUNT -q "
   SELECT TABLE_SCHEMA, COUNT(*) AS object_count
-  FROM SSOM_COCO_DB.INFORMATION_SCHEMA.TABLES
+  FROM FINANCE_CORE_DEV.INFORMATION_SCHEMA.TABLES
   GROUP BY TABLE_SCHEMA
   ORDER BY TABLE_SCHEMA;
 "
@@ -486,7 +519,7 @@ snow sql -c MY_TRIAL_ACCOUNT -q "
 ```bash
 snow sql -c MY_TRIAL_ACCOUNT -q "
   SELECT VERSION, SCRIPT, INSTALLED_ON, STATUS
-  FROM SSOM_COCO_DB.METADATA.SCHEMACHANGE_HISTORY
+  FROM FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY_DEV
   ORDER BY INSTALLED_ON DESC
   LIMIT 20;
 "
@@ -515,9 +548,9 @@ snow sql -c MY_TRIAL_ACCOUNT -q "
 
 2. CONTAIN
    - Suspend tasks if ETL is producing bad data:
-     ALTER TASK BRONZE.TASK_LOAD_CUSTOMER SUSPEND;
-     ALTER TASK BRONZE.TASK_LOAD_ACCOUNT SUSPEND;
-     ALTER TASK BRONZE.TASK_LOAD_TRANSACTION SUSPEND;
+     ALTER TASK RAW_DEV.TASK_LOAD_CUSTOMER SUSPEND;
+     ALTER TASK RAW_DEV.TASK_LOAD_ACCOUNT SUSPEND;
+     ALTER TASK RAW_DEV.TASK_LOAD_TRANSACTION SUSPEND;
 
 3. ROLLBACK (if needed)
    gh workflow run deploy-prod.yml -f action=rollback -f rollback_version=<last-good-tag>
@@ -572,7 +605,7 @@ bash scripts/deploy_schemachange.sh --env=<env>
 
 ```sql
 -- Clone prod to a test database
-CREATE DATABASE SSOM_COCO_DB_TEST CLONE SSOM_COCO_DB_PROD;
+CREATE DATABASE FINANCE_CORE_TEST CLONE FINANCE_CORE_PROD;
 ```
 
 ---
@@ -595,15 +628,15 @@ For production hardening, create dedicated roles:
 -- Deployment role (used by CI/CD)
 CREATE ROLE IF NOT EXISTS DEPLOY_ROLE;
 GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE DEPLOY_ROLE;
-GRANT ALL ON DATABASE SSOM_COCO_DB_PROD TO ROLE DEPLOY_ROLE;
+GRANT ALL ON DATABASE FINANCE_CORE_PROD TO ROLE DEPLOY_ROLE;
 GRANT ROLE DEPLOY_ROLE TO USER SOMSUJAY;
 
 -- Read-only role (for dashboards)
 CREATE ROLE IF NOT EXISTS READER_ROLE;
-GRANT USAGE ON DATABASE SSOM_COCO_DB_PROD TO ROLE READER_ROLE;
-GRANT USAGE ON SCHEMA SSOM_COCO_DB_PROD.GOLD TO ROLE READER_ROLE;
-GRANT SELECT ON ALL TABLES IN SCHEMA SSOM_COCO_DB_PROD.GOLD TO ROLE READER_ROLE;
-GRANT SELECT ON ALL VIEWS IN SCHEMA SSOM_COCO_DB_PROD.GOLD TO ROLE READER_ROLE;
+GRANT USAGE ON DATABASE FINANCE_CORE_PROD TO ROLE READER_ROLE;
+GRANT USAGE ON SCHEMA FINANCE_CORE_PROD.CONFORMED_PROD TO ROLE READER_ROLE;
+GRANT SELECT ON ALL TABLES IN SCHEMA FINANCE_CORE_PROD.CONFORMED_PROD TO ROLE READER_ROLE;
+GRANT SELECT ON ALL VIEWS IN SCHEMA FINANCE_CORE_PROD.CONFORMED_PROD TO ROLE READER_ROLE;
 ```
 
 ---
@@ -674,13 +707,13 @@ All tables have default 1-day retention. To recover dropped/modified data:
 
 ```sql
 -- Query data as of 1 hour ago
-SELECT * FROM BRONZE.T_CUSTOMER AT(OFFSET => -3600);
+SELECT * FROM RAW_DEV.T_CUSTOMER AT(OFFSET => -3600);
 
 -- Restore a dropped table
-UNDROP TABLE SILVER.DIMCUSTOMER;
+UNDROP TABLE CLEAN_DEV.DIMCUSTOMER;
 
 -- Clone table from a point in time
-CREATE TABLE SILVER.DIMCUSTOMER_BACKUP CLONE SILVER.DIMCUSTOMER
+CREATE TABLE CLEAN_DEV.DIMCUSTOMER_BACKUP CLONE CLEAN_DEV.DIMCUSTOMER
   AT(TIMESTAMP => '2026-07-15 10:00:00'::TIMESTAMP);
 ```
 
@@ -688,7 +721,7 @@ CREATE TABLE SILVER.DIMCUSTOMER_BACKUP CLONE SILVER.DIMCUSTOMER
 
 ```bash
 # 1. Recreate database
-snow sql -c MY_TRIAL_ACCOUNT -q "CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_PROD;"
+snow sql -c MY_TRIAL_ACCOUNT -q "CREATE DATABASE IF NOT EXISTS FINANCE_CORE_PROD;"
 
 # 2. Redeploy all migrations from scratch
 git checkout $(git describe --tags --abbrev=0)
@@ -733,13 +766,11 @@ CREATE WAREHOUSE IF NOT EXISTS COMPUTE_WH
   COMMENT = 'Shared compute for ETL pipeline';
 ```
 
-#### Step 3: Create Databases for Each Environment
+#### Step 3: Create Databases
 
 ```sql
-CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB;          -- dev
-CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_QA;       -- qa
-CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_PREPROD;  -- preprod
-CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_PROD;     -- prod
+CREATE DATABASE IF NOT EXISTS FINANCE_CORE_DEV;   -- dev, qa, preprod (schema-isolated)
+CREATE DATABASE IF NOT EXISTS FINANCE_CORE_PROD;  -- prod
 ```
 
 #### Step 4: Grant Permissions
@@ -747,10 +778,8 @@ CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_PROD;     -- prod
 ```sql
 GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE ACCOUNTADMIN;
 GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE SYSADMIN;
-GRANT ALL ON DATABASE SSOM_COCO_DB TO ROLE ACCOUNTADMIN;
-GRANT ALL ON DATABASE SSOM_COCO_DB_QA TO ROLE ACCOUNTADMIN;
-GRANT ALL ON DATABASE SSOM_COCO_DB_PREPROD TO ROLE ACCOUNTADMIN;
-GRANT ALL ON DATABASE SSOM_COCO_DB_PROD TO ROLE ACCOUNTADMIN;
+GRANT ALL ON DATABASE FINANCE_CORE_DEV TO ROLE ACCOUNTADMIN;
+GRANT ALL ON DATABASE FINANCE_CORE_PROD TO ROLE ACCOUNTADMIN;
 ```
 
 ---
@@ -804,7 +833,7 @@ user = "SOMSUJAY"
 authenticator = "SNOWFLAKE_JWT"
 private_key_path = "/Users/<your-username>/.snowflake/trial_key.p8"
 warehouse = "COMPUTE_WH"
-database = "SSOM_COCO_DB"
+database = "FINANCE_CORE_DEV"
 ```
 
 ```bash
@@ -889,7 +918,7 @@ account = "KXAXARZ-GW22129"
 user = "SOMSUJAY"
 authenticator = "externalbrowser"
 warehouse = "COMPUTE_WH"
-database = "SSOM_COCO_DB"
+database = "FINANCE_CORE_DEV"
 EOF
 chmod 600 streamlit_app/.streamlit/secrets.toml
 ```
@@ -932,11 +961,11 @@ bash scripts/run_incremental.sh
 
 # 7. Verify ETL results
 snow sql -c MY_TRIAL_ACCOUNT -q "
-  SELECT 'T_Customer' AS tbl, COUNT(*) AS rows FROM SSOM_COCO_DB.BRONZE.T_CUSTOMER
+  SELECT 'T_Customer' AS tbl, COUNT(*) AS rows FROM FINANCE_CORE_DEV.RAW_DEV.T_CUSTOMER
   UNION ALL
-  SELECT 'DimCustomer', COUNT(*) FROM SSOM_COCO_DB.SILVER.DIMCUSTOMER
+  SELECT 'DimCustomer', COUNT(*) FROM FINANCE_CORE_DEV.CLEAN_DEV.DIMCUSTOMER
   UNION ALL
-  SELECT 'FactDailyTransaction', COUNT(*) FROM SSOM_COCO_DB.GOLD.FACTDAILYTRANSACTION;
+  SELECT 'FactDailyTransaction', COUNT(*) FROM FINANCE_CORE_DEV.CONFORMED_DEV.FACTDAILYTRANSACTION;
 "
 
 # 8. Run lint
