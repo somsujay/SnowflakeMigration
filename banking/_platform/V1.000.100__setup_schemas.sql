@@ -1,7 +1,7 @@
 /* ============================================================
    schemachange Migration: V1.000.100__setup_schemas.sql
    PURPOSE : Create environment-specific schemas (RAW, CLEAN, CONFORMED, GOVERNANCE)
-             and shared METADATA schema.
+             and shared METADATA schema. Sujay Som
    ============================================================ */
 
 USE DATABASE {{ database }};
