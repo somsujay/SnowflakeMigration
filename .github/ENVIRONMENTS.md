@@ -5,41 +5,41 @@ This document describes how to configure GitHub Environments for the multi-stage
 ## Branching & Promotion Strategy
 
 ```
-feature/* ──► develop ──► release/* ──► main ──► tag v*
-                │              │            │          │
-              [DEV]          [QA]      [Pre-PROD]   [PROD]
-              (auto)        (auto)    (1 approval) (2 approvals)
+feature/* ──► develop ──► release/* ──► tag v*
+                │              │            │
+              [DEV]         [STAGE]       [PROD]
+              (auto)       (auto)      (2 approvals)
 ```
 
 ## GitHub Environments to Create
 
 Configure these in **Settings → Environments** in your GitHub repository.
 
-### 1. `qa`
+### 1. `dev`
 
 | Setting | Value |
 |---------|-------|
-| Deployment branches | `release/*` |
+| Deployment branches | `develop` |
 | Required reviewers | None |
 | Wait timer | None |
 
 **Secrets:**
 - `SNOWFLAKE_ACCOUNT` — Snowflake account identifier
 - `SNOWFLAKE_USER` — Service account username
-- `SNOWFLAKE_PASSWORD` — Service account password
+- `SNOWFLAKE_PRIVATE_KEY` — RSA private key for key pair auth
 
-### 2. `preprod`
+### 2. `stage`
 
 | Setting | Value |
 |---------|-------|
-| Deployment branches | `main` only |
+| Deployment branches | `release/*` |
 | Required reviewers | 1 reviewer minimum |
 | Wait timer | None |
 
 **Secrets:**
 - `SNOWFLAKE_ACCOUNT` — Snowflake account identifier
 - `SNOWFLAKE_USER` — Service account username
-- `SNOWFLAKE_PASSWORD` — Service account password
+- `SNOWFLAKE_PRIVATE_KEY` — RSA private key for key pair auth
 
 ### 3. `production`
 
@@ -52,24 +52,25 @@ Configure these in **Settings → Environments** in your GitHub repository.
 **Secrets:**
 - `SNOWFLAKE_PROD_ACCOUNT` — Production Snowflake account
 - `SNOWFLAKE_PROD_USER` — Production service account username
-- `SNOWFLAKE_PROD_PASSWORD` — Production service account password
+- `SNOWFLAKE_PROD_PRIVATE_KEY` — Production RSA private key
 
 ## Snowflake Databases (per environment)
 
-| Environment | Database | Warehouse |
-|-------------|----------|-----------|
-| DEV | `SSOM_COCO_DB` | `SSOM_COCO_WH` |
-| QA | `SSOM_COCO_DB_QA` | `SSOM_COCO_WH` |
-| Pre-PROD | `SSOM_COCO_DB_PREPROD` | `SSOM_COCO_WH` |
-| PROD | `SSOM_COCO_DB_PROD` | `PROD_WH` |
+| Environment | Database | Schemas | Warehouse |
+|-------------|----------|---------|-----------|
+| DEV | `FINANCE_CORE_DEV` | RAW, CLEAN, CONFORMED, GOVERNANCE, METADATA | `COMPUTE_WH` |
+| STAGE | `FINANCE_CORE_STAGE` | RAW, CLEAN, CONFORMED, GOVERNANCE, METADATA | `COMPUTE_WH` |
+| PROD | `FINANCE_CORE_PROD` | RAW, CLEAN, CONFORMED, GOVERNANCE, METADATA | `COMPUTE_WH` |
+
+Each environment is a fully isolated database. Schemas are identical across environments (no suffixes).
 
 ## Workflow Triggers
 
 | Workflow | Trigger | Target |
 |----------|---------|--------|
 | `ci.yml` | PR to develop/release/main | Lint + validate only |
-| `deploy-qa.yml` | Push to `release/*` | QA environment |
-| `deploy-preprod.yml` | Push to `main` | Pre-PROD environment |
+| `deploy-dev.yml` | Push to `develop` | DEV environment |
+| `deploy-stage.yml` | Push to `release/*` | STAGE environment |
 | `deploy-prod.yml` | Tag `v*` push | PROD environment |
 | `deploy-prod.yml` (dispatch) | Manual trigger | PROD rollback |
 
@@ -78,15 +79,14 @@ Configure these in **Settings → Environments** in your GitHub repository.
 ```bash
 # Deploy to any environment locally
 bash scripts/deploy.sh --env=dev
-bash scripts/deploy.sh --env=qa
-bash scripts/deploy.sh --env=preprod
+bash scripts/deploy.sh --env=stage
 bash scripts/deploy.sh --env=prod --dry-run   # always dry-run first for prod
 
-# Rollback (preprod/prod only)
+# Rollback (stage/prod only)
 bash scripts/rollback.sh --env=prod --version=v1.2.0
 
 # Run tests
-bash scripts/run_smoke_tests.sh --env=qa
+bash scripts/run_smoke_tests.sh --env=stage
 ```
 
 ## Rollback Procedure
@@ -108,7 +108,7 @@ bash scripts/rollback.sh --env=prod --version=v1.1.0
 If not using per-environment secrets, set these at the repository level:
 - `SNOWFLAKE_ACCOUNT`
 - `SNOWFLAKE_USER`
-- `SNOWFLAKE_PASSWORD`
+- `SNOWFLAKE_PRIVATE_KEY`
 - `SNOWFLAKE_PROD_ACCOUNT` (for PROD isolation)
 - `SNOWFLAKE_PROD_USER`
-- `SNOWFLAKE_PROD_PASSWORD`
+- `SNOWFLAKE_PROD_PRIVATE_KEY`

@@ -5,7 +5,7 @@
 #
 # Usage:
 #   bash scripts/run_smoke_tests.sh --env=dev
-#   bash scripts/run_smoke_tests.sh --env=qa
+#   bash scripts/run_smoke_tests.sh --env=stage
 #
 # Executes tests/smoke_test.sql with database placeholder substituted.
 # Exits non-zero if any query fails.
@@ -70,7 +70,7 @@ for arg in "$@"; do
 done
 
 if [[ -z "$ENV" ]]; then
-    echo "ERROR: --env is required. Usage: bash run_smoke_tests.sh --env=dev|qa"
+    echo "ERROR: --env is required. Usage: bash run_smoke_tests.sh --env=dev|stage|prod"
     exit 1
 fi
 

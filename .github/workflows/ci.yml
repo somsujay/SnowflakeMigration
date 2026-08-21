@@ -59,7 +59,7 @@ jobs:
 
       - name: Validate environments.yml structure
         run: |
-          for env in dev qa preprod prod; do
+          for env in dev stage prod; do
             if ! grep -q "^${env}:" environments.yml; then
               echo "ERROR: Environment '${env}' not found in environments.yml"
               exit 1

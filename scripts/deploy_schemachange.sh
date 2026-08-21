@@ -5,7 +5,7 @@
 #
 # Usage:
 #   bash scripts/deploy_schemachange.sh --env=dev
-#   bash scripts/deploy_schemachange.sh --env=qa
+#   bash scripts/deploy_schemachange.sh --env=stage
 #   bash scripts/deploy_schemachange.sh --env=prod --dry-run
 # ============================================================
 
@@ -32,7 +32,7 @@ done
 
 if [[ -z "$ENV" ]]; then
     echo "ERROR: --env is required."
-    echo "Usage: bash scripts/deploy_schemachange.sh --env=dev|qa|preprod|prod [--dry-run]"
+    echo "Usage: bash scripts/deploy_schemachange.sh --env=dev|stage|prod [--dry-run]"
     exit 1
 fi
 
@@ -49,19 +49,16 @@ parse_env_value() {
 DB=$(parse_env_value "database")
 WH=$(parse_env_value "warehouse")
 CONN=$(parse_env_value "connection")
-SUFFIX=$(parse_env_value "schema_suffix")
+RAW_SCHEMA=$(parse_env_value "raw_schema")
+CLEAN_SCHEMA=$(parse_env_value "clean_schema")
+CONFORMED_SCHEMA=$(parse_env_value "conformed_schema")
+GOVERNANCE_SCHEMA=$(parse_env_value "governance_schema")
 
-if [[ -z "$DB" || -z "$WH" || -z "$CONN" || -z "$SUFFIX" ]]; then
+if [[ -z "$DB" || -z "$WH" || -z "$CONN" ]]; then
     echo "ERROR: Could not parse environment '${ENV}' from ${ENV_FILE}"
-    echo "Required fields: database, warehouse, connection, schema_suffix"
+    echo "Required fields: database, warehouse, connection"
     exit 1
 fi
-
-# Build composite schema names
-RAW_SCHEMA="RAW${SUFFIX}"
-CLEAN_SCHEMA="CLEAN${SUFFIX}"
-CONFORMED_SCHEMA="CONFORMED${SUFFIX}"
-GOVERNANCE_SCHEMA="GOVERNANCE${SUFFIX}"
 
 # --- Resolve Snowflake credentials ---
 SNOWFLAKE_ACCOUNT="${SNOWFLAKE_ACCOUNT:-}"
@@ -98,7 +95,7 @@ echo "Dry-run:      ${DRY_RUN}"
 echo ""
 
 # --- Build schemachange command ---
-VARS_JSON="{\"database\": \"${DB}\", \"warehouse\": \"${WH}\", \"role\": \"${SNOWFLAKE_ROLE}\", \"environment\": \"${ENV}\", \"schema_suffix\": \"${SUFFIX}\", \"raw_schema\": \"${RAW_SCHEMA}\", \"clean_schema\": \"${CLEAN_SCHEMA}\", \"conformed_schema\": \"${CONFORMED_SCHEMA}\", \"governance_schema\": \"${GOVERNANCE_SCHEMA}\"}"
+VARS_JSON="{\"database\": \"${DB}\", \"warehouse\": \"${WH}\", \"role\": \"${SNOWFLAKE_ROLE}\", \"environment\": \"${ENV}\", \"raw_schema\": \"${RAW_SCHEMA}\", \"clean_schema\": \"${CLEAN_SCHEMA}\", \"conformed_schema\": \"${CONFORMED_SCHEMA}\", \"governance_schema\": \"${GOVERNANCE_SCHEMA}\"}"
 
 SCHEMACHANGE_ARGS=(
     deploy
@@ -108,7 +105,7 @@ SCHEMACHANGE_ARGS=(
     --snowflake-role "${SNOWFLAKE_ROLE}"
     --snowflake-warehouse "${SNOWFLAKE_WAREHOUSE}"
     --snowflake-database "${DB}"
-    --change-history-table "${DB}.METADATA.SCHEMACHANGE_HISTORY_${ENV^^}"
+    --change-history-table "${DB}.METADATA.SCHEMACHANGE_HISTORY"
     --vars "${VARS_JSON}"
     --create-change-history-table
     --autocommit

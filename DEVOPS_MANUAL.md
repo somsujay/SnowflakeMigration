@@ -8,24 +8,25 @@
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │ feature/* ─PR─► develop ─PR─► release/* ─PR─► main ─tag─► v*                │
-│     │              │              │             │           │                 │
-│     ▼              ▼              ▼             ▼           ▼                 │
-│ CI Lint       Deploy DEV     Deploy QA   Deploy PreProd  Deploy Prod         │
-│                    │              │             │           │                 │
+│     │              │              │                         │                 │
+│     ▼              ▼              ▼                         ▼                 │
+│ CI Lint       Deploy DEV     Deploy STAGE              Deploy Prod           │
+│                    │              │                         │                 │
 └──────────────────────────────────────────────────────────────────────────────┘
-                     │              │             │           │
-                     ▼              ▼             ▼           ▼
+                     │              │                         │
+                     ▼              ▼                         ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                       Snowflake (KXAXARZ-GW22129)                             │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  FINANCE_CORE_DEV (all non-prod envs share one DB, schema-isolated)          │
-│    ├── RAW_DEV / CLEAN_DEV / CONFORMED_DEV / GOVERNANCE_DEV                  │
-│    ├── RAW_QA  / CLEAN_QA  / CONFORMED_QA  / GOVERNANCE_QA                   │
-│    └── RAW_PREPROD / CLEAN_PREPROD / CONFORMED_PREPROD / GOVERNANCE_PREPROD   │
+│  FINANCE_CORE_DEV (development)                                              │
+│    └── RAW / CLEAN / CONFORMED / GOVERNANCE / METADATA                       │
+│                                                                              │
+│  FINANCE_CORE_STAGE (staging)                                                │
+│    └── RAW / CLEAN / CONFORMED / GOVERNANCE / METADATA                       │
 │                                                                              │
 │  FINANCE_CORE_PROD (production)                                              │
-│    └── RAW_PROD / CLEAN_PROD / CONFORMED_PROD / GOVERNANCE_PROD              │
+│    └── RAW / CLEAN / CONFORMED / GOVERNANCE / METADATA                       │
 │                                                                              │
 │  Warehouse: COMPUTE_WH (shared, XS)                                         │
 │                                                                              │
@@ -85,24 +86,23 @@ vars:
   warehouse: "COMPUTE_WH"
   role: "SYSADMIN"
   environment: "dev"
-  schema_suffix: "_DEV"
-  raw_schema: "RAW_DEV"
-  clean_schema: "CLEAN_DEV"
-  conformed_schema: "CONFORMED_DEV"
-  governance_schema: "GOVERNANCE_DEV"
+  raw_schema: "RAW"
+  clean_schema: "CLEAN"
+  conformed_schema: "CONFORMED"
+  governance_schema: "GOVERNANCE"
 
 create-change-history-table: true
-change-history-table: "FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY_DEV"
+change-history-table: "FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY"
 autocommit: true
 dry-run: false
 ```
 
 ### 2.3 Change History
 
-Schemachange tracks all applied migrations in `<database>.METADATA.SCHEMACHANGE_HISTORY_<ENV>`. Query it to see deployment state:
+Schemachange tracks all applied migrations in `<database>.METADATA.SCHEMACHANGE_HISTORY`. Query it to see deployment state:
 
 ```sql
-SELECT * FROM FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY_DEV ORDER BY INSTALLED_ON DESC;
+SELECT * FROM FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY ORDER BY INSTALLED_ON DESC;
 ```
 
 ---
@@ -115,8 +115,7 @@ SELECT * FROM FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY_DEV ORDER BY INSTAL
 |------|---------|---------|
 | `.github/workflows/ci.yml` | Lint + validate | Push to `feature/*`, PR to `develop`, `release/*`, `main` |
 | `.github/workflows/deploy-dev.yml` | Deploy + smoke test DEV | Push to `develop` |
-| `.github/workflows/deploy-qa.yml` | Deploy + test QA | Push to `release/*` |
-| `.github/workflows/deploy-preprod.yml` | Deploy + test PreProd | Push to `main` |
+| `.github/workflows/deploy-stage.yml` | Deploy + test STAGE | Push to `release/*` |
 | `.github/workflows/deploy-prod.yml` | Deploy + validate Prod | Tag `v*` or manual dispatch |
 
 ### 3.2 Branching Strategy
@@ -127,9 +126,8 @@ SELECT * FROM FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY_DEV ORDER BY INSTAL
 | `feature/*` → `develop` | PR | CI lint & validate |
 | `develop` | Push (merge) | Deploy to DEV |
 | `develop` → `release/*` | PR | CI lint & validate |
-| `release/*` | Push (merge) | Deploy to QA + smoke + integration tests |
+| `release/*` | Push (merge) | Deploy to STAGE + smoke + integration tests |
 | `release/*` → `main` | PR | CI lint & validate |
-| `main` | Push (merge) | Deploy to Pre-PROD + smoke + regression tests |
 | Tag `v*` on `main` | Tag push | Deploy to PROD + smoke + data validation |
 
 ### 3.3 Pipeline Stages
@@ -146,7 +144,7 @@ SELECT * FROM FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY_DEV ORDER BY INSTAL
 The CI workflow:
 1. Lints `banking/` with sqlfluff
 2. Validates versioned migration files (`V*.sql`) exist and are non-empty
-3. Checks `environments.yml` has all required environments
+3. Checks `environments.yml` has all required environments (dev, stage, prod)
 4. Runs shellcheck on deployment scripts
 
 Path triggers: `banking/**`, `scripts/**`, `tests/**`, `environments.yml`, `schemachange-config.yml`, `.sqlfluff`
@@ -201,13 +199,13 @@ This prevents PRs from being merged even if someone force-approves a review.
 
 ### 4.1 Required GitHub Secrets
 
-#### Non-Production (QA, PreProd)
+#### Non-Production (DEV, STAGE)
 
 | Secret | Value | Used By |
 |--------|-------|---------|
-| `SNOWFLAKE_ACCOUNT` | `KXAXARZ-GW22129` | deploy-qa, deploy-preprod |
-| `SNOWFLAKE_USER` | `SOMSUJAY` | deploy-qa, deploy-preprod |
-| `SNOWFLAKE_PRIVATE_KEY` | RSA private key (PEM) | deploy-qa, deploy-preprod |
+| `SNOWFLAKE_ACCOUNT` | `KXAXARZ-GW22129` | deploy-dev, deploy-stage |
+| `SNOWFLAKE_USER` | `SOMSUJAY` | deploy-dev, deploy-stage |
+| `SNOWFLAKE_PRIVATE_KEY` | RSA private key (PEM) | deploy-dev, deploy-stage |
 
 #### Production
 
@@ -259,8 +257,8 @@ export SNOWFLAKE_ACCOUNT=KXAXARZ-GW22129
 export SNOWFLAKE_USER=SOMSUJAY
 bash scripts/deploy_schemachange.sh --env=dev
 
-# Deploy to QA
-bash scripts/deploy_schemachange.sh --env=qa
+# Deploy to stage
+bash scripts/deploy_schemachange.sh --env=stage
 
 # Dry-run (no changes made)
 bash scripts/deploy_schemachange.sh --env=prod --dry-run
@@ -270,28 +268,28 @@ The script:
 1. Reads database/warehouse/connection from `environments.yml`
 2. Authenticates via RSA private key (`SNOWFLAKE_PRIVATE_KEY_PATH` or `~/.snowflake/ci_key.p8`)
 3. Runs `schemachange deploy` against the `banking/` folder
-4. Passes `database`, `warehouse`, `role`, and `environment` as template variables
+4. Passes `database`, `warehouse`, `role`, `environment`, and schema names as template variables
 5. Tracks history in `<database>.METADATA.SCHEMACHANGE_HISTORY`
 
 ### 5.2 Legacy Deployment: deploy.sh
 
-`scripts/deploy.sh` is the legacy deployer that executes numbered SQL scripts from a `Snowflake_Scripts/` directory. It is still referenced by the preprod workflow but will be migrated to schemachange.
+`scripts/deploy.sh` is the legacy deployer that executes SQL scripts directly via `snow sql`. It can still be used for manual deployments but schemachange is the primary method.
 
-### 5.3 Standard Release (QA → PreProd → Prod)
+### 5.3 Standard Release (DEV → STAGE → PROD)
 
 ```bash
 # 1. Create release branch from develop
 git checkout develop && git pull
 git checkout -b release/v1.3.0
 
-# 2. Push triggers deploy-qa.yml automatically (schemachange)
+# 2. Push triggers deploy-stage.yml automatically (schemachange)
 git push -u origin release/v1.3.0
 
-# 3. After QA passes, merge to main (triggers deploy-preprod.yml)
+# 3. After STAGE passes, merge to main
 gh pr create --base main --title "Release v1.3.0"
 gh pr merge <pr-number> --merge
 
-# 4. After PreProd passes, tag for production (triggers deploy-prod.yml)
+# 4. Tag for production (triggers deploy-prod.yml)
 git checkout main && git pull
 git tag v1.3.0
 git push origin v1.3.0
@@ -308,10 +306,10 @@ git checkout -b hotfix/fix-critical-bug
 git push -u origin hotfix/fix-critical-bug
 gh pr create --base main --title "Hotfix: fix critical bug"
 
-# 3. Merge to main (deploys to PreProd)
+# 3. Merge to main
 gh pr merge <pr-number> --merge
 
-# 4. After PreProd validates, tag for prod
+# 4. Tag for prod
 git checkout main && git pull
 git tag v1.2.1
 git push origin v1.2.1
@@ -336,7 +334,7 @@ touch banking/<layer>/<domain>/V1.11.0__add_new_table.sql
 
 # 2. Write your SQL (use Jinja vars for database targeting)
 #    Available vars: {{database}}, {{warehouse}}, {{role}}, {{environment}},
-#                    {{schema_suffix}}, {{raw_schema}}, {{clean_schema}},
+#                    {{raw_schema}}, {{clean_schema}},
 #                    {{conformed_schema}}, {{governance_schema}}
 
 # 3. Test locally with dry-run
@@ -366,8 +364,8 @@ gh workflow run deploy-prod.yml \
 ### 6.2 Manual Rollback (Any Environment)
 
 ```bash
-# Rollback PreProd to a specific version
-bash scripts/rollback.sh --env=preprod --version=v1.2.0
+# Rollback STAGE to a specific version
+bash scripts/rollback.sh --env=stage --version=v1.2.0
 
 # Rollback Prod to a specific commit SHA
 bash scripts/rollback.sh --env=prod --version=abc123f
@@ -410,44 +408,33 @@ Since schemachange tracks applied versions, rolling back requires one of:
 ```yaml
 dev:
   database: FINANCE_CORE_DEV
-  schema_suffix: _DEV
-  raw_schema: RAW_DEV
-  clean_schema: CLEAN_DEV
-  conformed_schema: CONFORMED_DEV
-  governance_schema: GOVERNANCE_DEV
+  raw_schema: RAW
+  clean_schema: CLEAN
+  conformed_schema: CONFORMED
+  governance_schema: GOVERNANCE
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
 
-qa:
-  database: FINANCE_CORE_DEV
-  schema_suffix: _QA
-  raw_schema: RAW_QA
-  clean_schema: CLEAN_QA
-  conformed_schema: CONFORMED_QA
-  governance_schema: GOVERNANCE_QA
-  warehouse: COMPUTE_WH
-  connection: MY_TRIAL_ACCOUNT
-
-preprod:
-  database: FINANCE_CORE_DEV
-  schema_suffix: _PREPROD
-  raw_schema: RAW_PREPROD
-  clean_schema: CLEAN_PREPROD
-  conformed_schema: CONFORMED_PREPROD
-  governance_schema: GOVERNANCE_PREPROD
+stage:
+  database: FINANCE_CORE_STAGE
+  raw_schema: RAW
+  clean_schema: CLEAN
+  conformed_schema: CONFORMED
+  governance_schema: GOVERNANCE
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
 
 prod:
   database: FINANCE_CORE_PROD
-  schema_suffix: _PROD
-  raw_schema: RAW_PROD
-  clean_schema: CLEAN_PROD
-  conformed_schema: CONFORMED_PROD
-  governance_schema: GOVERNANCE_PROD
+  raw_schema: RAW
+  clean_schema: CLEAN
+  conformed_schema: CONFORMED
+  governance_schema: GOVERNANCE
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
 ```
+
+Each environment is a **separate database** with identical schema names. No schema suffixes are used.
 
 ### 7.2 Environment Variable Overrides
 
@@ -464,20 +451,20 @@ Scripts accept runtime overrides:
 ### 7.3 Provisioning a New Environment
 
 ```sql
--- Non-prod environments share FINANCE_CORE_DEV with schema isolation.
--- Only prod needs a separate database:
+-- Each environment gets its own database:
+CREATE DATABASE IF NOT EXISTS FINANCE_CORE_DEV;
+CREATE DATABASE IF NOT EXISTS FINANCE_CORE_STAGE;
 CREATE DATABASE IF NOT EXISTS FINANCE_CORE_PROD;
-GRANT OWNERSHIP ON DATABASE FINANCE_CORE_PROD TO ROLE ACCOUNTADMIN;
 
--- 2. Grant warehouse usage
-GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE ACCOUNTADMIN;
+-- Grant warehouse usage
+GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE SYSADMIN;
 ```
 
 ```bash
-# 3. Deploy with schemachange
+# Deploy with schemachange
 bash scripts/deploy_schemachange.sh --env=<env>
 
-# 4. Verify
+# Verify
 bash scripts/run_smoke_tests.sh --env=<env>
 ```
 
@@ -519,7 +506,7 @@ snow sql -c MY_TRIAL_ACCOUNT -q "
 ```bash
 snow sql -c MY_TRIAL_ACCOUNT -q "
   SELECT VERSION, SCRIPT, INSTALLED_ON, STATUS
-  FROM FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY_DEV
+  FROM FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY
   ORDER BY INSTALLED_ON DESC
   LIMIT 20;
 "
@@ -535,7 +522,7 @@ snow sql -c MY_TRIAL_ACCOUNT -q "
 |-------|------------|---------------|----------|
 | SEV1 | Production data loss or corruption | Immediate | ETL writing bad data, tables dropped |
 | SEV2 | Production pipeline broken | 30 minutes | Procedures failing, tasks stuck |
-| SEV3 | Non-prod broken or degraded performance | 4 hours | QA deploy failure, slow queries |
+| SEV3 | Non-prod broken or degraded performance | 4 hours | Stage deploy failure, slow queries |
 | SEV4 | Cosmetic or documentation issue | Next sprint | Lint warnings, README outdated |
 
 ### 9.2 SEV1/SEV2 Response Playbook
@@ -548,9 +535,9 @@ snow sql -c MY_TRIAL_ACCOUNT -q "
 
 2. CONTAIN
    - Suspend tasks if ETL is producing bad data:
-     ALTER TASK RAW_DEV.TASK_LOAD_CUSTOMER SUSPEND;
-     ALTER TASK RAW_DEV.TASK_LOAD_ACCOUNT SUSPEND;
-     ALTER TASK RAW_DEV.TASK_LOAD_TRANSACTION SUSPEND;
+     ALTER TASK RAW.TASK_LOAD_CUSTOMER SUSPEND;
+     ALTER TASK RAW.TASK_LOAD_ACCOUNT SUSPEND;
+     ALTER TASK RAW.TASK_LOAD_TRANSACTION SUSPEND;
 
 3. ROLLBACK (if needed)
    gh workflow run deploy-prod.yml -f action=rollback -f rollback_version=<last-good-tag>
@@ -634,9 +621,9 @@ GRANT ROLE DEPLOY_ROLE TO USER SOMSUJAY;
 -- Read-only role (for dashboards)
 CREATE ROLE IF NOT EXISTS READER_ROLE;
 GRANT USAGE ON DATABASE FINANCE_CORE_PROD TO ROLE READER_ROLE;
-GRANT USAGE ON SCHEMA FINANCE_CORE_PROD.CONFORMED_PROD TO ROLE READER_ROLE;
-GRANT SELECT ON ALL TABLES IN SCHEMA FINANCE_CORE_PROD.CONFORMED_PROD TO ROLE READER_ROLE;
-GRANT SELECT ON ALL VIEWS IN SCHEMA FINANCE_CORE_PROD.CONFORMED_PROD TO ROLE READER_ROLE;
+GRANT USAGE ON SCHEMA FINANCE_CORE_PROD.CONFORMED TO ROLE READER_ROLE;
+GRANT SELECT ON ALL TABLES IN SCHEMA FINANCE_CORE_PROD.CONFORMED TO ROLE READER_ROLE;
+GRANT SELECT ON ALL VIEWS IN SCHEMA FINANCE_CORE_PROD.CONFORMED TO ROLE READER_ROLE;
 ```
 
 ---
@@ -707,13 +694,13 @@ All tables have default 1-day retention. To recover dropped/modified data:
 
 ```sql
 -- Query data as of 1 hour ago
-SELECT * FROM RAW_DEV.T_CUSTOMER AT(OFFSET => -3600);
+SELECT * FROM RAW.T_CUSTOMER AT(OFFSET => -3600);
 
 -- Restore a dropped table
-UNDROP TABLE CLEAN_DEV.DIMCUSTOMER;
+UNDROP TABLE CLEAN.DIMCUSTOMER;
 
 -- Clone table from a point in time
-CREATE TABLE CLEAN_DEV.DIMCUSTOMER_BACKUP CLONE CLEAN_DEV.DIMCUSTOMER
+CREATE TABLE CLEAN.DIMCUSTOMER_BACKUP CLONE CLEAN.DIMCUSTOMER
   AT(TIMESTAMP => '2026-07-15 10:00:00'::TIMESTAMP);
 ```
 
@@ -728,7 +715,7 @@ git checkout $(git describe --tags --abbrev=0)
 bash scripts/deploy_schemachange.sh --env=prod
 
 # 3. Reload data (if needed)
-bash scripts/run_historical.sh
+bash scripts/run_historical.sh --env=prod
 bash scripts/run_incremental.sh
 ```
 
@@ -769,17 +756,18 @@ CREATE WAREHOUSE IF NOT EXISTS COMPUTE_WH
 #### Step 3: Create Databases
 
 ```sql
-CREATE DATABASE IF NOT EXISTS FINANCE_CORE_DEV;   -- dev, qa, preprod (schema-isolated)
-CREATE DATABASE IF NOT EXISTS FINANCE_CORE_PROD;  -- prod
+CREATE DATABASE IF NOT EXISTS FINANCE_CORE_DEV;
+CREATE DATABASE IF NOT EXISTS FINANCE_CORE_STAGE;
+CREATE DATABASE IF NOT EXISTS FINANCE_CORE_PROD;
 ```
 
 #### Step 4: Grant Permissions
 
 ```sql
-GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE ACCOUNTADMIN;
 GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE SYSADMIN;
-GRANT ALL ON DATABASE FINANCE_CORE_DEV TO ROLE ACCOUNTADMIN;
-GRANT ALL ON DATABASE FINANCE_CORE_PROD TO ROLE ACCOUNTADMIN;
+GRANT ALL ON DATABASE FINANCE_CORE_DEV TO ROLE SYSADMIN;
+GRANT ALL ON DATABASE FINANCE_CORE_STAGE TO ROLE SYSADMIN;
+GRANT ALL ON DATABASE FINANCE_CORE_PROD TO ROLE SYSADMIN;
 ```
 
 ---
@@ -856,9 +844,9 @@ Navigate to **Settings > Environments** and create:
 
 | Environment | Protection Rules |
 |-------------|-----------------|
-| `qa` | None (auto-deploy) |
-| `preprod` | None (auto-deploy) |
-| `production` | Required reviewers, wait timer (optional) |
+| `dev` | None (auto-deploy) |
+| `stage` | 1 reviewer (recommended) |
+| `production` | Required reviewers (2), wait timer (optional) |
 
 #### Step 2: Configure Repository Secrets
 
@@ -906,39 +894,7 @@ SNOWFLAKE_ACCOUNT + SNOWFLAKE_USER + SNOWFLAKE_PRIVATE_KEY
 
 ---
 
-### 15.5 Streamlit Dashboard Configuration
-
-#### Step 1: Create Streamlit secrets file
-
-```bash
-mkdir -p streamlit_app/.streamlit
-cat > streamlit_app/.streamlit/secrets.toml << 'EOF'
-[snowflake]
-account = "KXAXARZ-GW22129"
-user = "SOMSUJAY"
-authenticator = "externalbrowser"
-warehouse = "COMPUTE_WH"
-database = "FINANCE_CORE_DEV"
-EOF
-chmod 600 streamlit_app/.streamlit/secrets.toml
-```
-
-#### Step 2: Start Dashboard
-
-```bash
-bash scripts/streamlit_start.sh
-# Dashboard runs at http://localhost:8501
-```
-
-#### Step 3: Stop Dashboard
-
-```bash
-bash scripts/streamlit_stop.sh
-```
-
----
-
-### 15.6 End-to-End Verification Checklist
+### 15.5 End-to-End Verification Checklist
 
 ```bash
 # 1. Verify Snowflake connection
@@ -954,18 +910,18 @@ bash scripts/deploy_schemachange.sh --env=dev
 bash scripts/run_smoke_tests.sh --env=dev
 
 # 5. Load historical data
-bash scripts/run_historical.sh
+bash scripts/run_historical.sh --env=dev
 
 # 6. Run incremental data
 bash scripts/run_incremental.sh
 
 # 7. Verify ETL results
 snow sql -c MY_TRIAL_ACCOUNT -q "
-  SELECT 'T_Customer' AS tbl, COUNT(*) AS rows FROM FINANCE_CORE_DEV.RAW_DEV.T_CUSTOMER
+  SELECT 'T_Customer' AS tbl, COUNT(*) AS rows FROM FINANCE_CORE_DEV.RAW.T_CUSTOMER
   UNION ALL
-  SELECT 'DimCustomer', COUNT(*) FROM FINANCE_CORE_DEV.CLEAN_DEV.DIMCUSTOMER
+  SELECT 'DimCustomer', COUNT(*) FROM FINANCE_CORE_DEV.CLEAN.DIMCUSTOMER
   UNION ALL
-  SELECT 'FactDailyTransaction', COUNT(*) FROM FINANCE_CORE_DEV.CONFORMED_DEV.FACTDAILYTRANSACTION;
+  SELECT 'FactDailyTransaction', COUNT(*) FROM FINANCE_CORE_DEV.CONFORMED.FACTDAILYTRANSACTION;
 "
 
 # 8. Run lint
@@ -983,7 +939,7 @@ gh pr create --base develop --title "Test: verify CI pipeline" --body "Testing C
 
 ---
 
-### 15.7 Configuration Reference Summary
+### 15.6 Configuration Reference Summary
 
 | Component | File/Location | Purpose |
 |-----------|---------------|---------|
@@ -995,29 +951,5 @@ gh pr create --base develop --title "Test: verify CI pipeline" --body "Testing C
 | GitHub secrets | Repository Settings | CI/CD authentication |
 | Lint config | `.sqlfluff` | SQL formatting rules |
 | Migration scripts | `banking/` | Versioned SQL migrations |
-| Streamlit secrets | `streamlit_app/.streamlit/secrets.toml` | Dashboard auth |
 | CI workflows | `.github/workflows/*.yml` | Pipeline definitions |
 | Deploy script | `scripts/deploy_schemachange.sh` | Schemachange deployment orchestrator |
-| Legacy deploy | `scripts/deploy.sh` | Legacy numbered-script deployer |
-| Rollback script | `scripts/rollback.sh` | Reverts to prior version |
-| Smoke tests | `tests/smoke_test.sql` | Post-deploy object checks |
-| Integration tests | `tests/integration_test.sql` | Deep validation checks |
-
----
-
-## 16. Scripts Reference
-
-| Script | Purpose | Usage |
-|--------|---------|-------|
-| `scripts/deploy_schemachange.sh` | Primary deployment via schemachange | `--env=<env> [--dry-run]` |
-| `scripts/deploy.sh` | Legacy deployment (numbered scripts) | `--env=<env> [--dry-run]` |
-| `scripts/rollback.sh` | Rollback to a git version | `--env=<env> --version=<tag>` |
-| `scripts/run_smoke_tests.sh` | Post-deploy smoke tests | `--env=<env>` |
-| `scripts/run_historical.sh` | Load historical data | `--env=<env> [--source=csv\|iceberg]` |
-| `scripts/run_incremental.sh` | Load incremental data | `--env=<env> [--source=csv\|iceberg]` |
-| `scripts/run_etl_end_to_end.sh` | Full ETL pipeline run | — |
-| `scripts/create_objects.sh` | Create all Snowflake objects | — |
-| `scripts/drop_objects.sh` | Drop all Snowflake objects | `--confirm` |
-| `scripts/bootstrap_change_history.sql` | Initialize schemachange history table | — |
-| `scripts/streamlit_start.sh` | Start Streamlit dashboard | — |
-| `scripts/streamlit_stop.sh` | Stop Streamlit dashboard | — |

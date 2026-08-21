@@ -23,7 +23,7 @@ set -e
 
 # --- Configuration ---
 CONN="${SNOWFLAKE_CONNECTION:-MY_TRIAL_ACCOUNT}"
-DB="${SNOWFLAKE_DATABASE:-SSOM_COCO_DB}"
+DB="${SNOWFLAKE_DATABASE:-FINANCE_CORE_DEV}"
 WH="${SNOWFLAKE_WAREHOUSE:-COMPUTE_WH}"
 
 # Resolve project root (parent of scripts/)

@@ -5,8 +5,7 @@
 #
 # Usage:
 #   bash scripts/deploy.sh --env=dev
-#   bash scripts/deploy.sh --env=qa
-#   bash scripts/deploy.sh --env=preprod
+#   bash scripts/deploy.sh --env=stage
 #   bash scripts/deploy.sh --env=prod --dry-run
 #
 # Reads target database/warehouse/connection from environments.yml
@@ -65,7 +64,7 @@ with os.fdopen(fd, 'w') as f:
     f.write('account = \"' + os.environ['SNOWFLAKE_ACCOUNT'] + '\"\n')
     f.write('user = \"' + os.environ['SNOWFLAKE_USER'] + '\"\n')
     f.write('password = \"' + os.environ['SNOWFLAKE_PASSWORD'] + '\"\n')
-    f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'SSOM_COCO_WH') + '\"\n')
+    f.write('warehouse = \"' + os.environ.get('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH') + '\"\n')
 print('Created:', path, 'with permissions', oct(os.stat(path).st_mode)[-3:])
 "
     else
@@ -104,7 +103,7 @@ done
 
 if [[ -z "$ENV" ]]; then
     echo "ERROR: --env is required."
-    echo "Usage: bash scripts/deploy.sh --env=dev|qa|preprod|prod [--dry-run]"
+    echo "Usage: bash scripts/deploy.sh --env=dev|stage|prod [--dry-run]"
     exit 1
 fi
 
@@ -124,7 +123,7 @@ CONN=$(parse_env_value "connection")
 
 if [[ -z "$DB" || -z "$WH" || -z "$CONN" ]]; then
     echo "ERROR: Could not parse environment '${ENV}' from ${ENV_FILE}"
-    echo "Available environments: dev, qa, preprod, prod"
+    echo "Available environments: dev, stage, prod"
     exit 1
 fi
 
