@@ -1,48 +1,48 @@
 /* ============================================================
    FILE    : integration_test.sql
    PURPOSE : Post-deployment integration validation
-   USAGE   : Executed after smoke tests pass in QA/Pre-PROD/PROD
+   USAGE   : Executed after smoke tests pass in STAGE/PROD
    NOTE    : Validates procedures execute, data quality, and policies
    ============================================================ */
 
 -- ----------------------------------------------------------
 -- TEST 1: Verify all schemas have expected object counts
 -- ----------------------------------------------------------
-SELECT 'BRONZE schema tables' AS test_name,
+SELECT 'RAW schema tables' AS test_name,
        COUNT(*) AS object_count,
        IFF(COUNT(*) >= 3, 'PASS', 'FAIL') AS result
 FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_SCHEMA = 'BRONZE'
+WHERE TABLE_SCHEMA = 'RAW'
   AND TABLE_TYPE = 'BASE TABLE';
 
-SELECT 'SILVER schema tables' AS test_name,
+SELECT 'CLEAN schema tables' AS test_name,
        COUNT(*) AS object_count,
        IFF(COUNT(*) >= 4, 'PASS', 'FAIL') AS result
 FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_SCHEMA = 'SILVER'
+WHERE TABLE_SCHEMA = 'CLEAN'
   AND TABLE_TYPE = 'BASE TABLE';
 
-SELECT 'GOLD schema tables' AS test_name,
+SELECT 'CONFORMED schema tables' AS test_name,
        COUNT(*) AS object_count,
        IFF(COUNT(*) >= 2, 'PASS', 'FAIL') AS result
 FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_SCHEMA = 'GOLD'
+WHERE TABLE_SCHEMA = 'CONFORMED'
   AND TABLE_TYPE = 'BASE TABLE';
 
 -- ----------------------------------------------------------
 -- TEST 2: Verify stored procedures are callable
 -- ----------------------------------------------------------
-SELECT 'Silver procedures' AS test_name,
+SELECT 'CLEAN procedures' AS test_name,
        COUNT(*) AS proc_count,
        IFF(COUNT(*) >= 5, 'PASS', 'FAIL') AS result
 FROM INFORMATION_SCHEMA.PROCEDURES
-WHERE PROCEDURE_SCHEMA = 'SILVER';
+WHERE PROCEDURE_SCHEMA = 'CLEAN';
 
-SELECT 'Gold procedures' AS test_name,
+SELECT 'CONFORMED procedures' AS test_name,
        COUNT(*) AS proc_count,
        IFF(COUNT(*) >= 2, 'PASS', 'FAIL') AS result
 FROM INFORMATION_SCHEMA.PROCEDURES
-WHERE PROCEDURE_SCHEMA = 'GOLD';
+WHERE PROCEDURE_SCHEMA = 'CONFORMED';
 
 -- ----------------------------------------------------------
 -- TEST 3: Verify orchestration procedure exists
@@ -56,7 +56,7 @@ WHERE PROCEDURE_NAME = 'DAILY_ETL_RUN';
 -- ----------------------------------------------------------
 -- TEST 4: Verify stages are configured
 -- ----------------------------------------------------------
-SHOW STAGES IN SCHEMA BRONZE;
+SHOW STAGES IN SCHEMA RAW;
 
 -- ----------------------------------------------------------
 -- TEST 5: Verify masking policies exist
@@ -74,15 +74,15 @@ WHERE TABLE_SCHEMA = 'GOVERNANCE'
   AND TABLE_NAME = 'DATA_QUALITY_LOG';
 
 -- ----------------------------------------------------------
--- TEST 7: Verify views exist in GOLD schema
+-- TEST 7: Verify views exist in CONFORMED schema
 -- ----------------------------------------------------------
-SELECT 'GOLD views' AS test_name,
+SELECT 'CONFORMED views' AS test_name,
        COUNT(*) AS view_count,
        IFF(COUNT(*) >= 2, 'PASS', 'FAIL') AS result
 FROM INFORMATION_SCHEMA.VIEWS
-WHERE TABLE_SCHEMA = 'GOLD';
+WHERE TABLE_SCHEMA = 'CONFORMED';
 
 -- ----------------------------------------------------------
 -- TEST 8: Verify tasks are created (stream-triggered)
 -- ----------------------------------------------------------
-SHOW TASKS IN SCHEMA BRONZE;
+SHOW TASKS IN SCHEMA RAW;

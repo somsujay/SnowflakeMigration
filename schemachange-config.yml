@@ -5,13 +5,12 @@ vars:
   warehouse: "COMPUTE_WH"
   role: "SYSADMIN"
   environment: "dev"
-  schema_suffix: "_DEV"
-  raw_schema: "RAW_DEV"
-  clean_schema: "CLEAN_DEV"
-  conformed_schema: "CONFORMED_DEV"
-  governance_schema: "GOVERNANCE_DEV"
+  raw_schema: "RAW"
+  clean_schema: "CLEAN"
+  conformed_schema: "CONFORMED"
+  governance_schema: "GOVERNANCE"
 
 create-change-history-table: true
-change-history-table: "FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY_DEV"
+change-history-table: "FINANCE_CORE_DEV.METADATA.SCHEMACHANGE_HISTORY"
 autocommit: true
 dry-run: false

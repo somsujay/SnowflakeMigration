@@ -4,7 +4,7 @@
 # Rollback a Snowflake deployment to a specific git version.
 #
 # Usage:
-#   bash scripts/rollback.sh --env=preprod --version=v1.2.0
+#   bash scripts/rollback.sh --env=stage --version=v1.2.0
 #   bash scripts/rollback.sh --env=prod --version=abc123f
 #
 # Checks out the SQL scripts from the specified tag/commit,
@@ -77,13 +77,13 @@ done
 
 if [[ -z "$ENV" || -z "$VERSION" ]]; then
     echo "ERROR: Both --env and --version are required."
-    echo "Usage: bash scripts/rollback.sh --env=preprod|prod --version=<tag-or-sha>"
+    echo "Usage: bash scripts/rollback.sh --env=stage|prod --version=<tag-or-sha>"
     exit 1
 fi
 
-if [[ "$ENV" != "preprod" && "$ENV" != "prod" ]]; then
-    echo "ERROR: Rollback is only supported for preprod and prod environments."
-    echo "For dev/qa, simply re-push your branch."
+if [[ "$ENV" != "stage" && "$ENV" != "prod" ]]; then
+    echo "ERROR: Rollback is only supported for stage and prod environments."
+    echo "For dev, simply re-push your branch."
     exit 1
 fi
 

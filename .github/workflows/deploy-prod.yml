@@ -115,7 +115,7 @@ jobs:
       - name: Run integration tests
         run: |
           snow sql -c MY_TRIAL_ACCOUNT \
-            --database SSOM_COCO_DB_PROD \
+            --database FINANCE_CORE_PROD \
             --warehouse COMPUTE_WH \
             -f tests/integration_test.sql
 

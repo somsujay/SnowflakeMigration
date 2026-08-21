@@ -1,4 +1,4 @@
-name: Deploy to QA
+name: Deploy to STAGE
 
 on:
   push:
@@ -11,14 +11,14 @@ on:
       - 'schemachange-config.yml'
 
 concurrency:
-  group: deploy-qa
+  group: deploy-stage
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy to QA
+    name: Deploy to STAGE
     runs-on: ubuntu-latest
-    environment: qa
+    environment: stage
     env:
       SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
       SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
@@ -40,7 +40,7 @@ jobs:
           echo "$SNOWFLAKE_PRIVATE_KEY" > ~/.snowflake/ci_key.p8
           chmod 600 ~/.snowflake/ci_key.p8
           chmod +x scripts/deploy_schemachange.sh
-          bash scripts/deploy_schemachange.sh --env=qa
+          bash scripts/deploy_schemachange.sh --env=stage
 
   smoke-test:
     name: Smoke Tests
@@ -59,7 +59,7 @@ jobs:
       - name: Run smoke tests
         run: |
           chmod +x scripts/run_smoke_tests.sh
-          bash scripts/run_smoke_tests.sh --env=qa
+          bash scripts/run_smoke_tests.sh --env=stage
 
   integration-test:
     name: Integration Tests
@@ -98,6 +98,6 @@ jobs:
       - name: Run integration tests
         run: |
           snow sql -c MY_TRIAL_ACCOUNT \
-            --database SSOM_COCO_DB_QA \
+            --database FINANCE_CORE_STAGE \
             --warehouse COMPUTE_WH \
             -f tests/integration_test.sql

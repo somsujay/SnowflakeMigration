@@ -1,47 +1,34 @@
 # Environment configuration for Snowflake deployments
 # Used by scripts/deploy.sh, scripts/rollback.sh, and CI/CD pipeline
 #
-# All environments share a single database (FINANCE_CORE_DEV)
-# with environment-prefixed schemas: RAW_DEV, CLEAN_DEV, etc.
+# Each environment is a separate database with identical schema names.
+# Schemas: RAW, CLEAN, CONFORMED, GOVERNANCE, METADATA
 #
-# Promotion path: dev → qa → preprod → prod
+# Promotion path: dev → stage → prod
 
 dev:
   database: FINANCE_CORE_DEV
-  schema_suffix: _DEV
-  raw_schema: RAW_DEV
-  clean_schema: CLEAN_DEV
-  conformed_schema: CONFORMED_DEV
-  governance_schema: GOVERNANCE_DEV
+  raw_schema: RAW
+  clean_schema: CLEAN
+  conformed_schema: CONFORMED
+  governance_schema: GOVERNANCE
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
 
-qa:
-  database: FINANCE_CORE_DEV
-  schema_suffix: _QA
-  raw_schema: RAW_QA
-  clean_schema: CLEAN_QA
-  conformed_schema: CONFORMED_QA
-  governance_schema: GOVERNANCE_QA
-  warehouse: COMPUTE_WH
-  connection: MY_TRIAL_ACCOUNT
-
-preprod:
-  database: FINANCE_CORE_DEV
-  schema_suffix: _PREPROD
-  raw_schema: RAW_PREPROD
-  clean_schema: CLEAN_PREPROD
-  conformed_schema: CONFORMED_PREPROD
-  governance_schema: GOVERNANCE_PREPROD
+stage:
+  database: FINANCE_CORE_STAGE
+  raw_schema: RAW
+  clean_schema: CLEAN
+  conformed_schema: CONFORMED
+  governance_schema: GOVERNANCE
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT
 
 prod:
   database: FINANCE_CORE_PROD
-  schema_suffix: _PROD
-  raw_schema: RAW_PROD
-  clean_schema: CLEAN_PROD
-  conformed_schema: CONFORMED_PROD
-  governance_schema: GOVERNANCE_PROD
+  raw_schema: RAW
+  clean_schema: CLEAN
+  conformed_schema: CONFORMED
+  governance_schema: GOVERNANCE
   warehouse: COMPUTE_WH
   connection: MY_TRIAL_ACCOUNT

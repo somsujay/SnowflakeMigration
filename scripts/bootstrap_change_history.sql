@@ -4,7 +4,7 @@
              table for tracking applied migrations.
 
    Run this ONCE per environment before the first schemachange deploy:
-     snow sql -c MY_TRIAL_ACCOUNT --database SSOM_COCO_DB -f scripts/bootstrap_change_history.sql
+     snow sql -c MY_TRIAL_ACCOUNT --database FINANCE_CORE_DEV -f scripts/bootstrap_change_history.sql
    ============================================================ */
 
 CREATE SCHEMA IF NOT EXISTS METADATA

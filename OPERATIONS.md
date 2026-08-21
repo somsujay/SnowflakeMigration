@@ -38,14 +38,13 @@ For the **production** environment, also set:
 
 ## Environment Configuration
 
-All environments are defined in `environments.yml`:
+All environments are defined in `environments.yml`. Each environment is a **separate database** with identical schema names (no suffixes):
 
-| Environment | Database | Warehouse | Trigger |
-|-------------|----------|-----------|---------|
-| dev | SSOM_COCO_DB | COMPUTE_WH | Push to `develop` |
-| qa | SSOM_COCO_DB_QA | COMPUTE_WH | Push to `release/*` |
-| preprod | SSOM_COCO_DB_PREPROD | COMPUTE_WH | Push to `main` |
-| prod | SSOM_COCO_DB_PROD | COMPUTE_WH | Tag `v*` |
+| Environment | Database | Schemas | Warehouse | Trigger |
+|-------------|----------|---------|-----------|---------|
+| dev | FINANCE_CORE_DEV | RAW, CLEAN, CONFORMED, GOVERNANCE | COMPUTE_WH | Push to `develop` |
+| stage | FINANCE_CORE_STAGE | RAW, CLEAN, CONFORMED, GOVERNANCE | COMPUTE_WH | Push to `release/*` |
+| prod | FINANCE_CORE_PROD | RAW, CLEAN, CONFORMED, GOVERNANCE | COMPUTE_WH | Tag `v*` |
 
 ### Environment Variable Overrides
 
@@ -82,8 +81,7 @@ bash scripts/deploy_schemachange.sh --env=dev
 ```bash
 # Deploy to a specific environment
 bash scripts/deploy_schemachange.sh --env=dev
-bash scripts/deploy_schemachange.sh --env=qa
-bash scripts/deploy_schemachange.sh --env=preprod
+bash scripts/deploy_schemachange.sh --env=stage
 bash scripts/deploy_schemachange.sh --env=prod
 
 # Dry-run (shows what would be deployed without executing)
@@ -96,7 +94,7 @@ bash scripts/deploy_schemachange.sh --env=prod --dry-run
 # Historical load (full reset + initial data)
 bash scripts/run_historical.sh --env=dev                  # CSV source (default)
 bash scripts/run_historical.sh --env=dev --source=iceberg # Iceberg/Parquet source
-bash scripts/run_historical.sh --env=qa                   # Target QA environment
+bash scripts/run_historical.sh --env=stage                # Target STAGE environment
 
 # Incremental load (requires historical load first)
 bash scripts/run_incremental.sh --env=dev                  # CSV source (default)
@@ -126,19 +124,9 @@ bash scripts/drop_objects.sh --confirm
 ### Rollback
 
 ```bash
-# Rollback to a previous version (preprod/prod only)
-bash scripts/rollback.sh --env=preprod --version=v1.2.0
+# Rollback to a previous version (stage/prod only)
+bash scripts/rollback.sh --env=stage --version=v1.2.0
 bash scripts/rollback.sh --env=prod --version=abc123f
-```
-
-### Streamlit Dashboard
-
-```bash
-# Start the analytics dashboard
-bash scripts/streamlit_start.sh
-
-# Stop the dashboard
-bash scripts/streamlit_stop.sh
 ```
 
 ---
@@ -151,8 +139,7 @@ bash scripts/streamlit_stop.sh
 |----------|---------|------|
 | CI Lint & Validate | Push to `feature/**`, PR to `develop`, `release/*`, `main` | `.github/workflows/ci.yml` |
 | Deploy to DEV | Push to `develop` | `.github/workflows/deploy-dev.yml` |
-| Deploy to QA | Push to `release/*` | `.github/workflows/deploy-qa.yml` |
-| Deploy to Pre-PROD | Push to `main` | `.github/workflows/deploy-preprod.yml` |
+| Deploy to STAGE | Push to `release/*` | `.github/workflows/deploy-stage.yml` |
 | Deploy to PROD | Tag `v*` or manual dispatch | `.github/workflows/deploy-prod.yml` |
 
 ### CI Pipeline Steps
@@ -214,7 +201,7 @@ All migrations live in `banking/` and are managed by [schemachange](https://gith
 
 | Version | Location | Objects Created |
 |---------|----------|----------------|
-| V1.0.0 | `_platform/` | BRONZE, SILVER, GOLD, GOVERNANCE, METADATA schemas |
+| V1.0.0 | `_platform/` | RAW, CLEAN, CONFORMED, GOVERNANCE, METADATA schemas |
 | V1.1.0 | `bronze/retail/` | T_Customer, T_Account, T_Transaction |
 | V1.2.0 | `silver/retail/` | DimCustomer, DimAccount, DimTransactionType, DimDate |
 | V1.3.0 | `gold/retail/` | FactDailyTransaction, FactDailyAgg |
@@ -245,7 +232,7 @@ Schemachange tracks applied migrations in `<DATABASE>.METADATA.SCHEMACHANGE_HIST
 2. Use Jinja variables for environment portability:
    ```sql
    USE DATABASE {{ database }};
-   ALTER TABLE SILVER.DIMCUSTOMER ADD COLUMN SEGMENT VARCHAR(50);
+   ALTER TABLE {{ clean_schema }}.DIMCUSTOMER ADD COLUMN SEGMENT VARCHAR(50);
    ```
 
 3. Test locally with dry-run:
@@ -258,7 +245,7 @@ Schemachange tracks applied migrations in `<DATABASE>.METADATA.SCHEMACHANGE_HIST
    bash scripts/deploy_schemachange.sh --env=dev
    ```
 
-5. Commit and push — CI/CD handles QA/preprod/prod automatically.
+5. Commit and push — CI/CD handles stage/prod automatically.
 
 ### Configuration
 
@@ -270,10 +257,14 @@ Schemachange tracks applied migrations in `<DATABASE>.METADATA.SCHEMACHANGE_HIST
 
 | Variable | Description | Example Value |
 |----------|-------------|---------------|
-| `{{ database }}` | Target database name | `SSOM_COCO_DB` |
+| `{{ database }}` | Target database name | `FINANCE_CORE_DEV` |
 | `{{ warehouse }}` | Compute warehouse | `COMPUTE_WH` |
 | `{{ role }}` | Deployment role | `SYSADMIN` |
 | `{{ environment }}` | Environment name | `dev` |
+| `{{ raw_schema }}` | Raw schema name | `RAW` |
+| `{{ clean_schema }}` | Clean schema name | `CLEAN` |
+| `{{ conformed_schema }}` | Conformed schema name | `CONFORMED` |
+| `{{ governance_schema }}` | Governance schema name | `GOVERNANCE` |
 
 ---
 
@@ -283,17 +274,17 @@ Schemachange tracks applied migrations in `<DATABASE>.METADATA.SCHEMACHANGE_HIST
 Source Files (CSV/Parquet)
     │
     ▼
-BRONZE (Raw Landing)
+RAW (Raw Landing)
     │  T_Customer, T_Account, T_Transaction
     │  Loaded via: Stage → Stream → Tasks (CSV) or COPY INTO (Parquet)
     │
     ▼
-SILVER (Conformed Dimensions)
+CLEAN (Conformed Dimensions)
     │  DimCustomer (SCD-2), DimAccount (SCD-1)
     │  DimTransactionType, DimDate
     │
     ▼
-GOLD (Business Facts)
+CONFORMED (Business Facts)
        FactDailyTransaction, FactDailyAgg
        Views: MonthlySpendProfile, TxnTypeTrend
 ```
@@ -308,7 +299,7 @@ GOLD (Business Facts)
 | `JWT token is invalid` | Public key not registered with user | Run `ALTER USER <user> SET RSA_PUBLIC_KEY='...'` in Snowflake |
 | `404 Not Found: post <account>.snowflakecomputing.com` | Wrong account identifier format | Use full format: `ORGNAME-ACCOUNTNAME` (e.g., `KXAXARZ-GW22129`) |
 | `Connection default is not configured` | Missing `-c` flag or connection not in toml | Ensure `~/.snowflake/connections.toml` has the connection section |
-| `Schema does not exist` | Database not created yet | Run `deploy.sh` for the target environment first |
+| `Schema does not exist` | Database not created yet | Run `deploy_schemachange.sh` for the target environment first |
 
 ---
 
@@ -316,20 +307,24 @@ GOLD (Business Facts)
 
 1. Add entry to `environments.yml`:
    ```yaml
-   staging:
-     database: SSOM_COCO_DB_STAGING
+   newenv:
+     database: FINANCE_CORE_NEWENV
+     raw_schema: RAW
+     clean_schema: CLEAN
+     conformed_schema: CONFORMED
+     governance_schema: GOVERNANCE
      warehouse: COMPUTE_WH
      connection: MY_TRIAL_ACCOUNT
    ```
 
 2. Create the database in Snowflake:
    ```sql
-   CREATE DATABASE IF NOT EXISTS SSOM_COCO_DB_STAGING;
+   CREATE DATABASE IF NOT EXISTS FINANCE_CORE_NEWENV;
    ```
 
 3. Deploy (schemachange will create the change history table and apply all migrations):
    ```bash
-   bash scripts/deploy_schemachange.sh --env=staging
+   bash scripts/deploy_schemachange.sh --env=newenv
    ```
 
 ---
@@ -356,5 +351,5 @@ GOLD (Business Facts)
    authenticator = "SNOWFLAKE_JWT"
    private_key_path = "/path/to/.snowflake/trial_key.p8"
    warehouse = "COMPUTE_WH"
-   database = "SSOM_COCO_DB"
+   database = "FINANCE_CORE_DEV"
    ```

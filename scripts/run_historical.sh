@@ -5,7 +5,7 @@
 #
 # Usage:
 #   bash run_historical.sh --env=dev                  # Default: CSV source
-#   bash run_historical.sh --env=qa --source=csv      # Explicit: CSV source
+#   bash run_historical.sh --env=stage --source=csv      # Explicit: CSV source
 #   bash run_historical.sh --env=dev --source=iceberg # Iceberg/Parquet source
 #
 # Flow:
@@ -65,13 +65,13 @@ if [[ -n "$ENV" ]]; then
     CONN=$(parse_env_value "connection")
     if [[ -z "$DB" || -z "$WH" || -z "$CONN" ]]; then
         echo "ERROR: Could not parse environment '${ENV}' from ${ENV_FILE}"
-        echo "Available environments: dev, qa, preprod, prod"
+        echo "Available environments: dev, stage, prod"
         exit 1
     fi
 else
     # Fallback to env vars or defaults (backwards compatible)
     CONN="${SNOWFLAKE_CONNECTION:-MY_TRIAL_ACCOUNT}"
-    DB="${SNOWFLAKE_DATABASE:-SSOM_COCO_DB}"
+    DB="${SNOWFLAKE_DATABASE:-FINANCE_CORE_DEV}"
     WH="${SNOWFLAKE_WAREHOUSE:-COMPUTE_WH}"
     ENV="dev"
 fi

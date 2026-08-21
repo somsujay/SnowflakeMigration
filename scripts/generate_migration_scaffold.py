@@ -10,7 +10,7 @@ the corresponding V/R/A file structure locally. Useful for:
 
 Usage:
     python scripts/generate_migration_scaffold.py --env=dev
-    python scripts/generate_migration_scaffold.py --env=preprod --output-dir=./recovered
+    python scripts/generate_migration_scaffold.py --env=stage --output-dir=./recovered
     python scripts/generate_migration_scaffold.py --env=prod --dry-run
 """
 
@@ -259,7 +259,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Generate schemachange V/R/A file structure from SCHEMACHANGE_HISTORY"
     )
-    parser.add_argument("--env", required=True, help="Environment to read from (dev, qa, preprod, prod)")
+    parser.add_argument("--env", required=True, help="Environment to read from (dev, stage, prod)")
     parser.add_argument("--output-dir", default=None, help="Output directory (default: ./banking)")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be created without writing files")
     parser.add_argument("--summary-only", action="store_true", help="Only print migration summary, don't generate files")
